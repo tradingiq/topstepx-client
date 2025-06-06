@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-
 	"github.com/tradingiq/topstepx-client"
 	"github.com/tradingiq/topstepx-client/client"
 	"github.com/tradingiq/topstepx-client/models"
+	"github.com/tradingiq/topstepx-client/samples"
 )
 
 func main() {
-	username := os.Getenv("TOPSTEPX_USERNAME")
-	apiKey := os.Getenv("TOPSTEPX_API_KEY")
+	username := samples.Config.Username
+	apiKey := samples.Config.ApiKey
 
 	if username == "" || apiKey == "" {
 		log.Fatal("Please set TOPSTEPX_USERNAME and TOPSTEPX_API_KEY environment variables")

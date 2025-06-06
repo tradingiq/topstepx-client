@@ -3,17 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
-
+	"github.com/tradingiq/topstepx-client"
 	"github.com/tradingiq/topstepx-client/client"
 	"github.com/tradingiq/topstepx-client/models"
-	"github.com/tradingiq/topstepx-client"
+	"github.com/tradingiq/topstepx-client/samples"
+	"log"
 )
 
 func main() {
-	username := os.Getenv("TOPSTEPX_USERNAME")
-	apiKey := os.Getenv("TOPSTEPX_API_KEY")
+	username := samples.Config.Username
+	apiKey := samples.Config.ApiKey
 
 	if username == "" || apiKey == "" {
 		log.Fatal("Please set TOPSTEPX_USERNAME and TOPSTEPX_API_KEY environment variables")
@@ -36,7 +35,7 @@ func main() {
 	fmt.Println("=== Contract Service Examples ===")
 
 	fmt.Println("\n1. Search Contracts - Live Markets")
-	searchText := "ES"
+	searchText := "MES"
 	liveContractsResp, err := tsxClient.Contract.SearchContracts(ctx, &models.SearchContractRequest{
 		SearchText: &searchText,
 		Live:       true,
@@ -67,30 +66,14 @@ func main() {
 
 	if demoContractsResp.Success {
 		fmt.Printf("Found %d demo contracts matching '%s'\n", len(demoContractsResp.Contracts), searchText)
-	}
-
-	fmt.Println("\n3. Search All Contracts (No Filter)")
-	allContractsResp, err := tsxClient.Contract.SearchContracts(ctx, &models.SearchContractRequest{
-		Live: true,
-	})
-	if err != nil {
-		log.Fatalf("Search all contracts failed: %v", err)
-	}
-
-	if allContractsResp.Success {
-		fmt.Printf("Total available contracts: %d\n", len(allContractsResp.Contracts))
-		if len(allContractsResp.Contracts) > 0 {
-			fmt.Println("First 5 contracts:")
-			for i := 0; i < 5 && i < len(allContractsResp.Contracts); i++ {
-				contract := allContractsResp.Contracts[i]
-				fmt.Printf("  - %s: %s\n", contract.ID, contract.Name)
-			}
+		for _, contract := range demoContractsResp.Contracts {
+			fmt.Printf("  - ID: %s, Name: %s, Active: %v\n", contract.ID, contract.Name, contract.ActiveContract)
 		}
 	}
 
-	fmt.Println("\n4. Search Contract by ID")
-	if len(liveContractsResp.Contracts) > 0 {
-		contractID := liveContractsResp.Contracts[0].ID
+	fmt.Println("\n3. Search Contract by ID")
+	if len(demoContractsResp.Contracts) > 0 {
+		contractID := demoContractsResp.Contracts[0].ID
 		contractByIdResp, err := tsxClient.Contract.SearchContractByID(ctx, &models.SearchContractByIdRequest{
 			ContractID: contractID,
 		})
@@ -112,7 +95,7 @@ func main() {
 	for _, symbol := range symbols {
 		resp, err := tsxClient.Contract.SearchContracts(ctx, &models.SearchContractRequest{
 			SearchText: &symbol,
-			Live:       true,
+			Live:       false,
 		})
 		if err != nil {
 			log.Printf("Search for %s failed: %v", symbol, err)
@@ -120,6 +103,9 @@ func main() {
 		}
 		if resp.Success {
 			fmt.Printf("  %s: Found %d contracts\n", symbol, len(resp.Contracts))
+			for _, con := range resp.Contracts {
+				fmt.Printf("  - ID: %s, Name: %s, Active: %v\n", con.ID, con.Name, con.ActiveContract)
+			}
 		}
 	}
 }
