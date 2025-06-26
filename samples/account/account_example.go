@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"github.com/tradingiq/topstepx-client"
 	"github.com/tradingiq/topstepx-client/client"
 	"github.com/tradingiq/topstepx-client/models"
 	"github.com/tradingiq/topstepx-client/samples"
+	"log"
 )
 
 func main() {

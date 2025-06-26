@@ -1,0 +1,368 @@
+package services
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"sync"
+
+	"github.com/philippseith/signalr"
+	"github.com/tradingiq/topstepx-client/client"
+)
+
+const (
+	MarketHubURL = "https://rtc.topstepx.com/hubs/market?access_token=%s"
+)
+
+type MarketDataWebSocketService struct {
+	client        *client.Client
+	conn          signalr.Client
+	receiver      *MarketDataReceiver
+	mu            sync.Mutex
+	isConnected   bool
+	subscriptions map[string]map[string]bool // map[contractID]map[dataType]bool
+}
+
+type MarketDataReceiver struct {
+	handlers map[string]func(string, interface{})
+	mu       sync.RWMutex
+}
+
+func NewMarketDataReceiver() *MarketDataReceiver {
+	return &MarketDataReceiver{
+		handlers: make(map[string]func(string, interface{})),
+	}
+}
+
+func (r *MarketDataReceiver) SetHandler(event string, handler func(string, interface{})) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.handlers[event] = handler
+}
+
+func (r *MarketDataReceiver) RemoveHandler(event string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.handlers, event)
+}
+
+func (r *MarketDataReceiver) GatewayQuote(contractID string, data interface{}) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if handler, ok := r.handlers["quote"]; ok {
+		handler(contractID, data)
+	}
+}
+
+func (r *MarketDataReceiver) GatewayTrade(contractID string, data interface{}) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if handler, ok := r.handlers["trade"]; ok {
+		handler(contractID, data)
+	}
+}
+
+func (r *MarketDataReceiver) GatewayDepth(contractID string, data interface{}) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if handler, ok := r.handlers["depth"]; ok {
+		handler(contractID, data)
+	}
+}
+
+func NewMarketDataWebSocketService(c *client.Client) *MarketDataWebSocketService {
+	return &MarketDataWebSocketService{
+		client:        c,
+		receiver:      NewMarketDataReceiver(),
+		subscriptions: make(map[string]map[string]bool),
+	}
+}
+
+func (s *MarketDataWebSocketService) Connect(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.isConnected {
+		return nil
+	}
+
+	token := s.client.GetToken()
+	if token == "" {
+		return fmt.Errorf("authentication token not set")
+	}
+
+	conn, err := signalr.NewClient(ctx,
+		signalr.WithHttpConnection(ctx, fmt.Sprintf(MarketHubURL, token),
+			signalr.WithHTTPHeaders(func() http.Header {
+				headers := http.Header{}
+				headers.Set("Authorization", "Bearer "+token)
+				return headers
+			}),
+		),
+		signalr.WithReceiver(s.receiver),
+		signalr.MaximumReceiveMessageSize(1024*1024), // 1MB instead of default 32KB
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to create SignalR client: %w", err)
+	}
+
+	conn.Start()
+
+	s.conn = conn
+	s.isConnected = true
+
+	// Set up reconnection handler
+	go s.handleReconnection()
+
+	return nil
+}
+
+func (s *MarketDataWebSocketService) Disconnect() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.isConnected || s.conn == nil {
+		return nil
+	}
+
+	s.conn.Stop()
+	s.isConnected = false
+	s.subscriptions = make(map[string]map[string]bool)
+
+	return nil
+}
+
+func (s *MarketDataWebSocketService) IsConnected() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.isConnected
+}
+
+func (s *MarketDataWebSocketService) SubscribeContractQuotes(contractID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.isConnected {
+		return fmt.Errorf("websocket not connected")
+	}
+
+	result := <-s.conn.Invoke("SubscribeContractQuotes", contractID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to subscribe to quotes for %s: %w", contractID, result.Error)
+	}
+
+	if s.subscriptions[contractID] == nil {
+		s.subscriptions[contractID] = make(map[string]bool)
+	}
+	s.subscriptions[contractID]["quotes"] = true
+	return nil
+}
+
+func (s *MarketDataWebSocketService) UnsubscribeContractQuotes(contractID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.isConnected {
+		return fmt.Errorf("websocket not connected")
+	}
+
+	result := <-s.conn.Invoke("UnsubscribeContractQuotes", contractID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to unsubscribe from quotes for %s: %w", contractID, result.Error)
+	}
+
+	if s.subscriptions[contractID] != nil {
+		delete(s.subscriptions[contractID], "quotes")
+		if len(s.subscriptions[contractID]) == 0 {
+			delete(s.subscriptions, contractID)
+		}
+	}
+	return nil
+}
+
+func (s *MarketDataWebSocketService) SubscribeContractTrades(contractID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.isConnected {
+		return fmt.Errorf("websocket not connected")
+	}
+
+	result := <-s.conn.Invoke("SubscribeContractTrades", contractID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to subscribe to trades for %s: %w", contractID, result.Error)
+	}
+
+	if s.subscriptions[contractID] == nil {
+		s.subscriptions[contractID] = make(map[string]bool)
+	}
+	s.subscriptions[contractID]["trades"] = true
+	return nil
+}
+
+func (s *MarketDataWebSocketService) UnsubscribeContractTrades(contractID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.isConnected {
+		return fmt.Errorf("websocket not connected")
+	}
+
+	result := <-s.conn.Invoke("UnsubscribeContractTrades", contractID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to unsubscribe from trades for %s: %w", contractID, result.Error)
+	}
+
+	if s.subscriptions[contractID] != nil {
+		delete(s.subscriptions[contractID], "trades")
+		if len(s.subscriptions[contractID]) == 0 {
+			delete(s.subscriptions, contractID)
+		}
+	}
+	return nil
+}
+
+func (s *MarketDataWebSocketService) SubscribeContractMarketDepth(contractID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.isConnected {
+		return fmt.Errorf("websocket not connected")
+	}
+
+	result := <-s.conn.Invoke("SubscribeContractMarketDepth", contractID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to subscribe to market depth for %s: %w", contractID, result.Error)
+	}
+
+	if s.subscriptions[contractID] == nil {
+		s.subscriptions[contractID] = make(map[string]bool)
+	}
+	s.subscriptions[contractID]["depth"] = true
+	return nil
+}
+
+func (s *MarketDataWebSocketService) UnsubscribeContractMarketDepth(contractID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.isConnected {
+		return fmt.Errorf("websocket not connected")
+	}
+
+	result := <-s.conn.Invoke("UnsubscribeContractMarketDepth", contractID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to unsubscribe from market depth for %s: %w", contractID, result.Error)
+	}
+
+	if s.subscriptions[contractID] != nil {
+		delete(s.subscriptions[contractID], "depth")
+		if len(s.subscriptions[contractID]) == 0 {
+			delete(s.subscriptions, contractID)
+		}
+	}
+	return nil
+}
+
+func (s *MarketDataWebSocketService) SubscribeAll(contractID string) error {
+	if err := s.SubscribeContractQuotes(contractID); err != nil {
+		return err
+	}
+	if err := s.SubscribeContractTrades(contractID); err != nil {
+		return err
+	}
+	if err := s.SubscribeContractMarketDepth(contractID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *MarketDataWebSocketService) UnsubscribeAll(contractID string) error {
+	if err := s.UnsubscribeContractQuotes(contractID); err != nil {
+		return err
+	}
+	if err := s.UnsubscribeContractTrades(contractID); err != nil {
+		return err
+	}
+	if err := s.UnsubscribeContractMarketDepth(contractID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *MarketDataWebSocketService) UnsubscribeAllContracts() error {
+	s.mu.Lock()
+	contracts := make([]string, 0, len(s.subscriptions))
+	for contractID := range s.subscriptions {
+		contracts = append(contracts, contractID)
+	}
+	s.mu.Unlock()
+
+	for _, contractID := range contracts {
+		if err := s.UnsubscribeAll(contractID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *MarketDataWebSocketService) SetQuoteHandler(handler func(string, interface{})) {
+	s.receiver.SetHandler("quote", handler)
+}
+
+func (s *MarketDataWebSocketService) SetTradeHandler(handler func(string, interface{})) {
+	s.receiver.SetHandler("trade", handler)
+}
+
+func (s *MarketDataWebSocketService) SetDepthHandler(handler func(string, interface{})) {
+	s.receiver.SetHandler("depth", handler)
+}
+
+func (s *MarketDataWebSocketService) handleReconnection() {
+	// The SignalR client handles reconnection automatically
+	// We'll need to monitor connection state and resubscribe when needed
+	// This is a placeholder for future reconnection handling
+}
+
+func (s *MarketDataWebSocketService) resubscribe() {
+	s.mu.Lock()
+	// Create a copy of subscriptions to avoid holding lock during invocations
+	subs := make(map[string]map[string]bool)
+	for contractID, dataTypes := range s.subscriptions {
+		subs[contractID] = make(map[string]bool)
+		for dataType, subscribed := range dataTypes {
+			subs[contractID][dataType] = subscribed
+		}
+	}
+	s.mu.Unlock()
+
+	// Resubscribe to all previously subscribed data
+	for contractID, dataTypes := range subs {
+		if dataTypes["quotes"] {
+			<-s.conn.Send("SubscribeContractQuotes", contractID)
+		}
+		if dataTypes["trades"] {
+			<-s.conn.Send("SubscribeContractTrades", contractID)
+		}
+		if dataTypes["depth"] {
+			<-s.conn.Send("SubscribeContractMarketDepth", contractID)
+		}
+	}
+}
+
+func (s *MarketDataWebSocketService) GetSubscriptions() map[string]map[string]bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Return a copy to prevent external modifications
+	result := make(map[string]map[string]bool)
+	for contractID, dataTypes := range s.subscriptions {
+		result[contractID] = make(map[string]bool)
+		for dataType, subscribed := range dataTypes {
+			result[contractID][dataType] = subscribed
+		}
+	}
+	return result
+}
+

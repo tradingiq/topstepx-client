@@ -12,31 +12,33 @@ import (
 type Client struct {
 	client *client.Client
 
-	Auth      *services.AuthService
-	Account   *services.AccountService
-	Contract  *services.ContractService
-	Order     *services.OrderService
-	Position  *services.PositionService
-	History   *services.HistoryService
-	Trade     *services.TradeService
-	Status    *services.StatusService
-	WebSocket *services.WebSocketService
+	Auth       *services.AuthService
+	Account    *services.AccountService
+	Contract   *services.ContractService
+	Order      *services.OrderService
+	Position   *services.PositionService
+	History    *services.HistoryService
+	Trade      *services.TradeService
+	Status     *services.StatusService
+	WebSocket  *services.WebSocketService
+	MarketData *services.MarketDataWebSocketService
 }
 
 func NewClient(httpOpts ...client.Option) *Client {
 	c := client.NewClient(httpOpts...)
 
 	return &Client{
-		client:    c,
-		Auth:      services.NewAuthService(c),
-		Account:   services.NewAccountService(c),
-		Contract:  services.NewContractService(c),
-		Order:     services.NewOrderService(c),
-		Position:  services.NewPositionService(c),
-		History:   services.NewHistoryService(c),
-		Trade:     services.NewTradeService(c),
-		Status:    services.NewStatusService(c),
-		WebSocket: services.NewWebSocketService(c),
+		client:     c,
+		Auth:       services.NewAuthService(c),
+		Account:    services.NewAccountService(c),
+		Contract:   services.NewContractService(c),
+		Order:      services.NewOrderService(c),
+		Position:   services.NewPositionService(c),
+		History:    services.NewHistoryService(c),
+		Trade:      services.NewTradeService(c),
+		Status:     services.NewStatusService(c),
+		WebSocket:  services.NewWebSocketService(c),
+		MarketData: services.NewMarketDataWebSocketService(c),
 	}
 }
 
@@ -124,11 +126,28 @@ func (c *Client) GetActiveAccounts(ctx context.Context) ([]models.TradingAccount
 	return resp.Accounts, nil
 }
 
+func (c *Client) ConnectMarketData(ctx context.Context) error {
+	if c.GetToken() == "" {
+		return fmt.Errorf("no authentication token available, please login first")
+	}
+
+	if err := c.MarketData.Connect(ctx); err != nil {
+		return fmt.Errorf("failed to connect market data WebSocket: %w", err)
+	}
+
+	return nil
+}
+
 func (c *Client) Disconnect(ctx context.Context) error {
 
 	if c.WebSocket.IsConnected() {
 		c.WebSocket.UnsubscribeAll()
 		c.WebSocket.Disconnect()
+	}
+
+	if c.MarketData.IsConnected() {
+		c.MarketData.UnsubscribeAllContracts()
+		c.MarketData.Disconnect()
 	}
 
 	_, err := c.Auth.Logout(ctx)
