@@ -233,43 +233,43 @@ resp, err := client.Contract.SearchContracts(ctx, &models.SearchContractsRequest
 resp, err := client.Contract.GetContract(ctx, contractID)
 ```
 
-### WebSocket Real-time Data
+### User Data Real-time Updates
 
 ```go
 // Set up event handlers
-client.WebSocket.SetAccountHandler(func(data interface{}) {
+client.UserData.SetAccountHandler(func(data interface{}) {
     fmt.Printf("Account update: %+v\n", data)
 })
 
-client.WebSocket.SetOrderHandler(func(data interface{}) {
+client.UserData.SetOrderHandler(func(data interface{}) {
     fmt.Printf("Order update: %+v\n", data)
 })
 
-client.WebSocket.SetPositionHandler(func(data interface{}) {
+client.UserData.SetPositionHandler(func(data interface{}) {
     fmt.Printf("Position update: %+v\n", data)
 })
 
-client.WebSocket.SetTradeHandler(func(data interface{}) {
+client.UserData.SetTradeHandler(func(data interface{}) {
     fmt.Printf("Trade update: %+v\n", data)
 })
 
 // Connect and subscribe
-err := client.WebSocket.Connect(ctx)
+err := client.UserData.Connect(ctx)
 if err != nil {
-    log.Fatalf("WebSocket connection failed: %v", err)
+    log.Fatalf("UserData connection failed: %v", err)
 }
 
 // Subscribe to all events for an account
-err = client.WebSocket.SubscribeAll(accountID)
+err = client.UserData.SubscribeAll(accountID)
 if err != nil {
     log.Fatalf("Subscription failed: %v", err)
 }
 
 // Or subscribe to specific events
-err = client.WebSocket.SubscribeToAccount(accountID)
-err = client.WebSocket.SubscribeToOrders(accountID)
-err = client.WebSocket.SubscribeToPositions(accountID)
-err = client.WebSocket.SubscribeToTrades(accountID)
+err = client.UserData.SubscribeAccounts()
+err = client.UserData.SubscribeOrders(accountID)
+err = client.UserData.SubscribePositions(accountID)
+err = client.UserData.SubscribeTrades(accountID)
 ```
 
 ## Order Types
@@ -339,7 +339,7 @@ if !resp.Success {
 ### Connection Management
 - Reuse client instances across operations
 - Use context with appropriate timeouts
-- Handle WebSocket reconnections gracefully
+- Handle user data reconnections gracefully
 
 ### Rate Limiting
 - The API may have rate limits - implement appropriate backoff strategies
@@ -347,7 +347,7 @@ if !resp.Success {
 - Monitor for rate limit error codes
 
 ### Memory Management
-- Close WebSocket connections when done
+- Close user data connections when done
 - Use context cancellation for long-running operations
 - Properly handle large result sets
 
@@ -362,7 +362,7 @@ cd samples/account && go run account_example.go
 # Order example
 cd samples/order && go run order_example.go
 
-# WebSocket integration example
+# User data integration example
 cd samples/websocket && go run integrated_example.go
 
 # Position management example
@@ -382,7 +382,7 @@ The `samples/` directory contains comprehensive examples:
 - **Historical Data**: `samples/history/history_example.go`
 - **Contract Search**: `samples/contract/contract_example.go`
 - **Trade History**: `samples/trade/trade_example.go`
-- **WebSocket Integration**: `samples/websocket/integrated_example.go`
+- **User Data Integration**: `samples/websocket/integrated_example.go`
 - **Status Monitoring**: `samples/status/status_example.go`
 
 ## Security
@@ -423,7 +423,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Changelog
 
 ### Latest Updates
-- Full WebSocket support with automatic reconnection
+- Full user data support with automatic reconnection
 - Comprehensive error handling and logging
 - Multi-account management capabilities
 - Historical data access with multiple timeframes

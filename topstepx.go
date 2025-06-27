@@ -20,7 +20,7 @@ type Client struct {
 	History    *services.HistoryService
 	Trade      *services.TradeService
 	Status     *services.StatusService
-	WebSocket  *services.WebSocketService
+	UserData   *services.UserDataWebSocketService
 	MarketData *services.MarketDataWebSocketService
 }
 
@@ -37,7 +37,7 @@ func NewClient(httpOpts ...client.Option) *Client {
 		History:    services.NewHistoryService(c),
 		Trade:      services.NewTradeService(c),
 		Status:     services.NewStatusService(c),
-		WebSocket:  services.NewWebSocketService(c),
+		UserData:   services.NewUserDataWebSocketService(c),
 		MarketData: services.NewMarketDataWebSocketService(c),
 	}
 }
@@ -75,11 +75,11 @@ func (c *Client) ConnectWebSocketWithAccount(ctx context.Context, accountID int)
 		return fmt.Errorf("no authentication token available, please login first")
 	}
 
-	if err := c.WebSocket.Connect(ctx); err != nil {
+	if err := c.UserData.Connect(ctx); err != nil {
 		return fmt.Errorf("failed to connect WebSocket: %w", err)
 	}
 
-	if err := c.WebSocket.SubscribeAll(accountID); err != nil {
+	if err := c.UserData.SubscribeAll(accountID); err != nil {
 		return fmt.Errorf("failed to subscribe to WebSocket events: %w", err)
 	}
 
@@ -140,9 +140,9 @@ func (c *Client) ConnectMarketData(ctx context.Context) error {
 
 func (c *Client) Disconnect(ctx context.Context) error {
 
-	if c.WebSocket.IsConnected() {
-		c.WebSocket.UnsubscribeAll()
-		c.WebSocket.Disconnect()
+	if c.UserData.IsConnected() {
+		c.UserData.UnsubscribeAll()
+		c.UserData.Disconnect()
 	}
 
 	if c.MarketData.IsConnected() {

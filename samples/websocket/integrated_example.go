@@ -94,7 +94,7 @@ func main() {
 	fmt.Println("\nSetting up WebSocket handlers...")
 
 	// Set up connection state handler
-	client.WebSocket.SetConnectionHandler(func(state services.ConnectionState) {
+	client.UserData.SetConnectionHandler(func(state services.ConnectionState) {
 		switch state {
 		case services.StateDisconnected:
 			fmt.Println("\nWebSocket disconnected")
@@ -107,29 +107,29 @@ func main() {
 		}
 	})
 
-	client.WebSocket.SetAccountHandler(func(data interface{}) {
+	client.UserData.SetAccountHandler(func(data interface{}) {
 		fmt.Printf("\n[ACCOUNT UPDATE] %+v\n", data)
 	})
 
-	client.WebSocket.SetOrderHandler(func(data interface{}) {
+	client.UserData.SetOrderHandler(func(data interface{}) {
 		fmt.Printf("\n[ORDER UPDATE] %+v\n", data)
 	})
 
-	client.WebSocket.SetPositionHandler(func(data interface{}) {
+	client.UserData.SetPositionHandler(func(data interface{}) {
 		fmt.Printf("\n[POSITION UPDATE] %+v\n", data)
 	})
 
-	client.WebSocket.SetTradeHandler(func(data interface{}) {
+	client.UserData.SetTradeHandler(func(data interface{}) {
 		fmt.Printf("\n[TRADE UPDATE] %+v\n", data)
 	})
 
 	fmt.Println("\nConnecting to WebSocket...")
-	if err := client.WebSocket.Connect(ctx); err != nil {
+	if err := client.UserData.Connect(ctx); err != nil {
 		log.Fatalf("Failed to connect to WebSocket: %v", err)
 	}
 
 	fmt.Printf("\nSubscribing to all events for account %d...\n", selectedAccount.ID)
-	if err := client.WebSocket.SubscribeAll(int(selectedAccount.ID)); err != nil {
+	if err := client.UserData.SubscribeAll(int(selectedAccount.ID)); err != nil {
 		log.Fatalf("Failed to subscribe to events: %v", err)
 	}
 	fmt.Println("Successfully subscribed to all events!")
@@ -149,12 +149,12 @@ func main() {
 	fmt.Println("\n\nShutting down...")
 
 	fmt.Println("Unsubscribing from events...")
-	if err := client.WebSocket.UnsubscribeAll(); err != nil {
+	if err := client.UserData.UnsubscribeAll(); err != nil {
 		log.Printf("Error unsubscribing: %v", err)
 	}
 
 	fmt.Println("Disconnecting WebSocket...")
-	if err := client.WebSocket.Disconnect(); err != nil {
+	if err := client.UserData.Disconnect(); err != nil {
 		log.Printf("Error disconnecting WebSocket: %v", err)
 	}
 

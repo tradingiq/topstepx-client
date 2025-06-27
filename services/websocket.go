@@ -15,10 +15,10 @@ const (
 	UserHubURL = "https://rtc.topstepx.com/hubs/user?access_token=%s"
 )
 
-type WebSocketService struct {
+type UserDataWebSocketService struct {
 	client              *client.Client
 	conn                signalr.Client
-	receiver            *WebSocketReceiver
+	receiver            *UserDataReceiver
 	mu                  sync.Mutex
 	state               ConnectionState
 	accountID           int
@@ -31,32 +31,32 @@ type WebSocketService struct {
 	reconnectAttempts   int
 }
 
-type WebSocketReceiver struct {
+type UserDataReceiver struct {
 	handlers map[string]func(interface{})
 	mu       sync.RWMutex
-	service  *WebSocketService
+	service  *UserDataWebSocketService
 }
 
-func NewWebSocketReceiver(service *WebSocketService) *WebSocketReceiver {
-	return &WebSocketReceiver{
+func NewUserDataReceiver(service *UserDataWebSocketService) *UserDataReceiver {
+	return &UserDataReceiver{
 		handlers: make(map[string]func(interface{})),
 		service:  service,
 	}
 }
 
-func (r *WebSocketReceiver) SetHandler(event string, handler func(interface{})) {
+func (r *UserDataReceiver) SetHandler(event string, handler func(interface{})) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.handlers[event] = handler
 }
 
-func (r *WebSocketReceiver) RemoveHandler(event string) {
+func (r *UserDataReceiver) RemoveHandler(event string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.handlers, event)
 }
 
-func (r *WebSocketReceiver) GatewayUserAccount(data interface{}) {
+func (r *UserDataReceiver) GatewayUserAccount(data interface{}) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if handler, ok := r.handlers["account"]; ok {
@@ -64,7 +64,7 @@ func (r *WebSocketReceiver) GatewayUserAccount(data interface{}) {
 	}
 }
 
-func (r *WebSocketReceiver) GatewayUserOrder(data interface{}) {
+func (r *UserDataReceiver) GatewayUserOrder(data interface{}) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if handler, ok := r.handlers["order"]; ok {
@@ -72,7 +72,7 @@ func (r *WebSocketReceiver) GatewayUserOrder(data interface{}) {
 	}
 }
 
-func (r *WebSocketReceiver) GatewayUserPosition(data interface{}) {
+func (r *UserDataReceiver) GatewayUserPosition(data interface{}) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if handler, ok := r.handlers["position"]; ok {
@@ -80,7 +80,7 @@ func (r *WebSocketReceiver) GatewayUserPosition(data interface{}) {
 	}
 }
 
-func (r *WebSocketReceiver) GatewayUserTrade(data interface{}) {
+func (r *UserDataReceiver) GatewayUserTrade(data interface{}) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if handler, ok := r.handlers["trade"]; ok {
@@ -89,7 +89,7 @@ func (r *WebSocketReceiver) GatewayUserTrade(data interface{}) {
 }
 
 // ConnectionClosed is called by SignalR when the connection is closed
-func (r *WebSocketReceiver) ConnectionClosed() {
+func (r *UserDataReceiver) ConnectionClosed() {
 	if r.service != nil {
 		r.service.mu.Lock()
 		if r.service.state == StateConnected {
@@ -106,19 +106,19 @@ func (r *WebSocketReceiver) ConnectionClosed() {
 	}
 }
 
-func NewWebSocketService(c *client.Client) *WebSocketService {
-	s := &WebSocketService{
+func NewUserDataWebSocketService(c *client.Client) *UserDataWebSocketService {
+	s := &UserDataWebSocketService{
 		client:            c,
 		subscriptions:     make(map[string]bool),
 		state:             StateDisconnected,
 		maxReconnectDelay: 30 * time.Second,
 		reconnectChan:     make(chan struct{}, 1),
 	}
-	s.receiver = NewWebSocketReceiver(s)
+	s.receiver = NewUserDataReceiver(s)
 	return s
 }
 
-func (s *WebSocketService) Connect(ctx context.Context) error {
+func (s *UserDataWebSocketService) Connect(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -164,7 +164,7 @@ func (s *WebSocketService) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (s *WebSocketService) Disconnect() error {
+func (s *UserDataWebSocketService) Disconnect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -188,25 +188,25 @@ func (s *WebSocketService) Disconnect() error {
 	return nil
 }
 
-func (s *WebSocketService) IsConnected() bool {
+func (s *UserDataWebSocketService) IsConnected() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.state == StateConnected
 }
 
-func (s *WebSocketService) GetConnectionState() ConnectionState {
+func (s *UserDataWebSocketService) GetConnectionState() ConnectionState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.state
 }
 
-func (s *WebSocketService) SetConnectionHandler(handler func(ConnectionState)) {
+func (s *UserDataWebSocketService) SetConnectionHandler(handler func(ConnectionState)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.connectionHandler = handler
 }
 
-func (s *WebSocketService) setState(state ConnectionState) {
+func (s *UserDataWebSocketService) setState(state ConnectionState) {
 	s.state = state
 	if s.connectionHandler != nil {
 		// Call handler in goroutine to avoid blocking
@@ -214,13 +214,13 @@ func (s *WebSocketService) setState(state ConnectionState) {
 	}
 }
 
-func (s *WebSocketService) SetAccountID(accountID int) {
+func (s *UserDataWebSocketService) SetAccountID(accountID int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.accountID = accountID
 }
 
-func (s *WebSocketService) SubscribeAccounts() error {
+func (s *UserDataWebSocketService) SubscribeAccounts() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -237,7 +237,7 @@ func (s *WebSocketService) SubscribeAccounts() error {
 	return nil
 }
 
-func (s *WebSocketService) UnsubscribeAccounts() error {
+func (s *UserDataWebSocketService) UnsubscribeAccounts() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -254,7 +254,7 @@ func (s *WebSocketService) UnsubscribeAccounts() error {
 	return nil
 }
 
-func (s *WebSocketService) SubscribeOrders(accountID int) error {
+func (s *UserDataWebSocketService) SubscribeOrders(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -272,7 +272,7 @@ func (s *WebSocketService) SubscribeOrders(accountID int) error {
 	return nil
 }
 
-func (s *WebSocketService) UnsubscribeOrders(accountID int) error {
+func (s *UserDataWebSocketService) UnsubscribeOrders(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -289,7 +289,7 @@ func (s *WebSocketService) UnsubscribeOrders(accountID int) error {
 	return nil
 }
 
-func (s *WebSocketService) SubscribePositions(accountID int) error {
+func (s *UserDataWebSocketService) SubscribePositions(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -307,7 +307,7 @@ func (s *WebSocketService) SubscribePositions(accountID int) error {
 	return nil
 }
 
-func (s *WebSocketService) UnsubscribePositions(accountID int) error {
+func (s *UserDataWebSocketService) UnsubscribePositions(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -324,7 +324,7 @@ func (s *WebSocketService) UnsubscribePositions(accountID int) error {
 	return nil
 }
 
-func (s *WebSocketService) SubscribeTrades(accountID int) error {
+func (s *UserDataWebSocketService) SubscribeTrades(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -342,7 +342,7 @@ func (s *WebSocketService) SubscribeTrades(accountID int) error {
 	return nil
 }
 
-func (s *WebSocketService) UnsubscribeTrades(accountID int) error {
+func (s *UserDataWebSocketService) UnsubscribeTrades(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -359,7 +359,7 @@ func (s *WebSocketService) UnsubscribeTrades(accountID int) error {
 	return nil
 }
 
-func (s *WebSocketService) SubscribeAll(accountID int) error {
+func (s *UserDataWebSocketService) SubscribeAll(accountID int) error {
 	if err := s.SubscribeAccounts(); err != nil {
 		return err
 	}
@@ -375,7 +375,7 @@ func (s *WebSocketService) SubscribeAll(accountID int) error {
 	return nil
 }
 
-func (s *WebSocketService) UnsubscribeAll() error {
+func (s *UserDataWebSocketService) UnsubscribeAll() error {
 	s.mu.Lock()
 	accountID := s.accountID
 	s.mu.Unlock()
@@ -397,23 +397,23 @@ func (s *WebSocketService) UnsubscribeAll() error {
 	return nil
 }
 
-func (s *WebSocketService) SetAccountHandler(handler func(interface{})) {
+func (s *UserDataWebSocketService) SetAccountHandler(handler func(interface{})) {
 	s.receiver.SetHandler("account", handler)
 }
 
-func (s *WebSocketService) SetOrderHandler(handler func(interface{})) {
+func (s *UserDataWebSocketService) SetOrderHandler(handler func(interface{})) {
 	s.receiver.SetHandler("order", handler)
 }
 
-func (s *WebSocketService) SetPositionHandler(handler func(interface{})) {
+func (s *UserDataWebSocketService) SetPositionHandler(handler func(interface{})) {
 	s.receiver.SetHandler("position", handler)
 }
 
-func (s *WebSocketService) SetTradeHandler(handler func(interface{})) {
+func (s *UserDataWebSocketService) SetTradeHandler(handler func(interface{})) {
 	s.receiver.SetHandler("trade", handler)
 }
 
-func (s *WebSocketService) handleReconnection() {
+func (s *UserDataWebSocketService) handleReconnection() {
 	// Monitor connection state
 	for {
 		select {
@@ -430,7 +430,7 @@ func (s *WebSocketService) handleReconnection() {
 	}
 }
 
-func (s *WebSocketService) checkConnectionHealth() {
+func (s *UserDataWebSocketService) checkConnectionHealth() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -451,7 +451,7 @@ func (s *WebSocketService) checkConnectionHealth() {
 	}
 }
 
-func (s *WebSocketService) reconnect() {
+func (s *UserDataWebSocketService) reconnect() {
 	s.mu.Lock()
 	if s.state == StateDisconnected {
 		s.mu.Unlock()
@@ -527,7 +527,7 @@ func (s *WebSocketService) reconnect() {
 	}
 }
 
-func (s *WebSocketService) resubscribe() {
+func (s *UserDataWebSocketService) resubscribe() {
 	s.mu.Lock()
 	subs := make(map[string]bool)
 	for k, v := range s.subscriptions {
