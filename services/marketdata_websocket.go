@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/philippseith/signalr"
 	"github.com/tradingiq/topstepx-client/client"
@@ -16,13 +17,28 @@ const (
 	MarketHubURL = "https://rtc.topstepx.com/hubs/market?access_token=%s"
 )
 
+type ConnectionState int
+
+const (
+	StateDisconnected ConnectionState = iota
+	StateConnecting
+	StateConnected
+	StateReconnecting
+)
+
 type MarketDataWebSocketService struct {
-	client        *client.Client
-	conn          signalr.Client
-	receiver      *MarketDataReceiver
-	mu            sync.Mutex
-	isConnected   bool
-	subscriptions map[string]map[string]bool // map[contractID]map[dataType]bool
+	client              *client.Client
+	conn                signalr.Client
+	receiver            *MarketDataReceiver
+	mu                  sync.Mutex
+	state               ConnectionState
+	subscriptions       map[string]map[string]bool // map[contractID]map[dataType]bool
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	reconnectChan       chan struct{}
+	connectionHandler   func(ConnectionState)
+	maxReconnectDelay   time.Duration
+	reconnectAttempts   int
 }
 
 type MarketDataReceiver struct {
@@ -30,10 +46,13 @@ type MarketDataReceiver struct {
 	tradeHandler func(string, models.TradeData)
 	depthHandler func(string, models.MarketDepthData)
 	mu           sync.RWMutex
+	service      *MarketDataWebSocketService
 }
 
-func NewMarketDataReceiver() *MarketDataReceiver {
-	return &MarketDataReceiver{}
+func NewMarketDataReceiver(service *MarketDataWebSocketService) *MarketDataReceiver {
+	return &MarketDataReceiver{
+		service: service,
+	}
 }
 
 func (r *MarketDataReceiver) SetQuoteHandler(handler func(string, models.Quote)) {
@@ -52,6 +71,24 @@ func (r *MarketDataReceiver) SetDepthHandler(handler func(string, models.MarketD
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.depthHandler = handler
+}
+
+// ConnectionClosed is called by SignalR when the connection is closed
+func (r *MarketDataReceiver) ConnectionClosed() {
+	if r.service != nil {
+		r.service.mu.Lock()
+		if r.service.state == StateConnected {
+			r.service.setState(StateReconnecting)
+			r.service.mu.Unlock()
+			// Trigger reconnection
+			select {
+			case r.service.reconnectChan <- struct{}{}:
+			default:
+			}
+		} else {
+			r.service.mu.Unlock()
+		}
+	}
 }
 
 func (r *MarketDataReceiver) GatewayQuote(contractID string, data interface{}) {
@@ -115,28 +152,37 @@ func (r *MarketDataReceiver) GatewayDepth(contractID string, data interface{}) {
 }
 
 func NewMarketDataWebSocketService(c *client.Client) *MarketDataWebSocketService {
-	return &MarketDataWebSocketService{
-		client:        c,
-		receiver:      NewMarketDataReceiver(),
-		subscriptions: make(map[string]map[string]bool),
+	s := &MarketDataWebSocketService{
+		client:            c,
+		subscriptions:     make(map[string]map[string]bool),
+		state:             StateDisconnected,
+		maxReconnectDelay: 30 * time.Second,
+		reconnectChan:     make(chan struct{}, 1),
 	}
+	s.receiver = NewMarketDataReceiver(s)
+	return s
 }
 
 func (s *MarketDataWebSocketService) Connect(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.isConnected {
+	if s.state == StateConnected || s.state == StateConnecting {
 		return nil
 	}
 
+	// Create a cancellable context for this connection
+	s.ctx, s.cancel = context.WithCancel(ctx)
+	s.setState(StateConnecting)
+
 	token := s.client.GetToken()
 	if token == "" {
+		s.setState(StateDisconnected)
 		return fmt.Errorf("authentication token not set")
 	}
 
-	conn, err := signalr.NewClient(ctx,
-		signalr.WithHttpConnection(ctx, fmt.Sprintf(MarketHubURL, token),
+	conn, err := signalr.NewClient(s.ctx,
+		signalr.WithHttpConnection(s.ctx, fmt.Sprintf(MarketHubURL, token),
 			signalr.WithHTTPHeaders(func() http.Header {
 				headers := http.Header{}
 				headers.Set("Authorization", "Bearer "+token)
@@ -148,13 +194,15 @@ func (s *MarketDataWebSocketService) Connect(ctx context.Context) error {
 	)
 
 	if err != nil {
+		s.setState(StateDisconnected)
 		return fmt.Errorf("failed to create SignalR client: %w", err)
 	}
 
 	conn.Start()
 
 	s.conn = conn
-	s.isConnected = true
+	s.setState(StateConnected)
+	s.reconnectAttempts = 0
 
 	// Set up reconnection handler
 	go s.handleReconnection()
@@ -166,12 +214,20 @@ func (s *MarketDataWebSocketService) Disconnect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected || s.conn == nil {
+	if s.state == StateDisconnected {
 		return nil
 	}
 
-	s.conn.Stop()
-	s.isConnected = false
+	// Cancel the context to stop reconnection attempts
+	if s.cancel != nil {
+		s.cancel()
+	}
+
+	if s.conn != nil {
+		s.conn.Stop()
+	}
+
+	s.setState(StateDisconnected)
 	s.subscriptions = make(map[string]map[string]bool)
 
 	return nil
@@ -180,14 +236,34 @@ func (s *MarketDataWebSocketService) Disconnect() error {
 func (s *MarketDataWebSocketService) IsConnected() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.isConnected
+	return s.state == StateConnected
+}
+
+func (s *MarketDataWebSocketService) GetConnectionState() ConnectionState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.state
+}
+
+func (s *MarketDataWebSocketService) SetConnectionHandler(handler func(ConnectionState)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.connectionHandler = handler
+}
+
+func (s *MarketDataWebSocketService) setState(state ConnectionState) {
+	s.state = state
+	if s.connectionHandler != nil {
+		// Call handler in goroutine to avoid blocking
+		go s.connectionHandler(state)
+	}
 }
 
 func (s *MarketDataWebSocketService) SubscribeContractQuotes(contractID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -207,7 +283,7 @@ func (s *MarketDataWebSocketService) UnsubscribeContractQuotes(contractID string
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -229,7 +305,7 @@ func (s *MarketDataWebSocketService) SubscribeContractTrades(contractID string) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -249,7 +325,7 @@ func (s *MarketDataWebSocketService) UnsubscribeContractTrades(contractID string
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -271,7 +347,7 @@ func (s *MarketDataWebSocketService) SubscribeContractMarketDepth(contractID str
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -291,7 +367,7 @@ func (s *MarketDataWebSocketService) UnsubscribeContractMarketDepth(contractID s
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -364,9 +440,120 @@ func (s *MarketDataWebSocketService) SetDepthHandler(handler func(string, models
 }
 
 func (s *MarketDataWebSocketService) handleReconnection() {
-	// The SignalR client handles reconnection automatically
-	// We'll need to monitor connection state and resubscribe when needed
-	// This is a placeholder for future reconnection handling
+	// Monitor connection state
+	for {
+		select {
+		case <-s.ctx.Done():
+			// Context cancelled, stop monitoring
+			return
+		case <-time.After(5 * time.Second):
+			// Check connection state periodically
+			s.checkConnectionHealth()
+		case <-s.reconnectChan:
+			// Trigger immediate reconnection
+			s.reconnect()
+		}
+	}
+}
+
+func (s *MarketDataWebSocketService) checkConnectionHealth() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.state != StateConnected || s.conn == nil {
+		return
+	}
+
+	// Try to ping the server to check if connection is alive
+	// If the connection is dead, the SignalR client should handle it
+	// but we'll also trigger reconnection if needed
+	result := <-s.conn.Invoke("ping")
+	if result.Error != nil {
+		// Connection seems dead, trigger reconnection
+		s.setState(StateReconnecting)
+		select {
+		case s.reconnectChan <- struct{}{}:
+		default:
+			// Channel already has a signal
+		}
+	}
+}
+
+func (s *MarketDataWebSocketService) reconnect() {
+	s.mu.Lock()
+	if s.state == StateDisconnected {
+		s.mu.Unlock()
+		return
+	}
+	s.setState(StateReconnecting)
+	s.mu.Unlock()
+
+	// Exponential backoff for reconnection
+	baseDelay := time.Second
+	maxDelay := s.maxReconnectDelay
+	
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
+		s.reconnectAttempts++
+		delay := baseDelay * time.Duration(1<<uint(s.reconnectAttempts-1))
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+
+		// Wait before attempting reconnection
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+
+		// Attempt to reconnect
+		s.mu.Lock()
+		if s.conn != nil {
+			s.conn.Stop()
+		}
+		s.mu.Unlock()
+
+		token := s.client.GetToken()
+		if token == "" {
+			continue
+		}
+
+		conn, err := signalr.NewClient(s.ctx,
+			signalr.WithHttpConnection(s.ctx, fmt.Sprintf(MarketHubURL, token),
+				signalr.WithHTTPHeaders(func() http.Header {
+					headers := http.Header{}
+					headers.Set("Authorization", "Bearer "+token)
+					return headers
+				}),
+			),
+			signalr.WithReceiver(s.receiver),
+			signalr.MaximumReceiveMessageSize(1024*1024),
+		)
+
+		if err != nil {
+			continue
+		}
+
+		conn.Start()
+
+		s.mu.Lock()
+		s.conn = conn
+		s.setState(StateConnected)
+		s.reconnectAttempts = 0
+		s.mu.Unlock()
+
+		// Resubscribe to all previous subscriptions
+		s.resubscribe()
+		
+		// Successfully reconnected
+		return
+	}
 }
 
 func (s *MarketDataWebSocketService) resubscribe() {

@@ -12,6 +12,7 @@ import (
 
 	topstepx "github.com/tradingiq/topstepx-client"
 	"github.com/tradingiq/topstepx-client/models"
+	"github.com/tradingiq/topstepx-client/services"
 )
 
 func main() {
@@ -30,11 +31,23 @@ func main() {
 	}
 	fmt.Println("Login successful!")
 
+	client.MarketData.SetConnectionHandler(func(state services.ConnectionState) {
+		switch state {
+		case services.StateDisconnected:
+			fmt.Println("Market data WebSocket disconnected")
+		case services.StateConnecting:
+			fmt.Println("Connecting to market data WebSocket...")
+		case services.StateConnected:
+			fmt.Println("Market data WebSocket connected!")
+		case services.StateReconnecting:
+			fmt.Println("Reconnecting to market data WebSocket...")
+		}
+	})
+
 	fmt.Println("Connecting to market data WebSocket...")
 	if err := client.MarketData.Connect(ctx); err != nil {
 		log.Fatal("Failed to connect to market data WebSocket: ", err)
 	}
-	fmt.Println("Market data WebSocket connected!")
 
 	client.MarketData.SetQuoteHandler(func(contractID string, quote models.Quote) {
 		fmt.Printf("\nQUOTE for %s:\n", contractID)
