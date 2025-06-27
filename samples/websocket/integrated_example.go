@@ -14,6 +14,7 @@ import (
 
 	"github.com/tradingiq/topstepx-client"
 	"github.com/tradingiq/topstepx-client/models"
+	"github.com/tradingiq/topstepx-client/services"
 )
 
 func main() {
@@ -92,6 +93,20 @@ func main() {
 
 	fmt.Println("\nSetting up WebSocket handlers...")
 
+	// Set up connection state handler
+	client.WebSocket.SetConnectionHandler(func(state services.ConnectionState) {
+		switch state {
+		case services.StateDisconnected:
+			fmt.Println("\nWebSocket disconnected")
+		case services.StateConnecting:
+			fmt.Println("\nConnecting to WebSocket...")
+		case services.StateConnected:
+			fmt.Println("\nWebSocket connected!")
+		case services.StateReconnecting:
+			fmt.Println("\nReconnecting to WebSocket...")
+		}
+	})
+
 	client.WebSocket.SetAccountHandler(func(data interface{}) {
 		fmt.Printf("\n[ACCOUNT UPDATE] %+v\n", data)
 	})
@@ -112,7 +127,6 @@ func main() {
 	if err := client.WebSocket.Connect(ctx); err != nil {
 		log.Fatalf("Failed to connect to WebSocket: %v", err)
 	}
-	fmt.Println("WebSocket connected successfully!")
 
 	fmt.Printf("\nSubscribing to all events for account %d...\n", selectedAccount.ID)
 	if err := client.WebSocket.SubscribeAll(int(selectedAccount.ID)); err != nil {

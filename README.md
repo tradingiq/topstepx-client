@@ -3,11 +3,11 @@
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-⚠️ **This library is currently under active development and may undergo breaking changes.**
+**This library is currently under active development and may undergo breaking changes.**
 
 A comprehensive Go client library for the TopStepX trading platform API, providing full access to trading operations, real-time data streaming, and account management functionality.
 
-## 🚀 Features
+## Features
 
 ### Core Trading Operations
 - **Order Management**: Place, modify, and cancel orders with support for all order types
@@ -31,7 +31,7 @@ A comprehensive Go client library for the TopStepX trading platform API, providi
 - **Context Support**: Full context.Context support for timeouts and cancellation
 - **Concurrent Operations**: Thread-safe operations with proper synchronization
 
-## 📦 Installation
+## Installation
 
 ```bash
 go get github.com/tradingiq/topstepx-client
@@ -43,7 +43,7 @@ go get github.com/tradingiq/topstepx-client
 - Active TopStepX trading account
 - API credentials (username and API key)
 
-## 🔧 Quick Start
+## Quick Start
 
 ### Basic Setup
 
@@ -92,7 +92,7 @@ TOPSTEPX_USERNAME=your-username
 TOPSTEPX_API_KEY=your-api-key
 ```
 
-## 📖 API Reference
+## API Reference
 
 ### Client Initialization
 
@@ -272,7 +272,7 @@ err = client.WebSocket.SubscribeToPositions(accountID)
 err = client.WebSocket.SubscribeToTrades(accountID)
 ```
 
-## 🔧 Order Types
+## Order Types
 
 The library supports all TopStepX order types:
 
@@ -297,7 +297,7 @@ models.OrderTypeJoinBid
 models.OrderTypeJoinAsk
 ```
 
-## 📊 Bar Types and Timeframes
+## Bar Types and Timeframes
 
 Historical data supports multiple timeframes:
 
@@ -310,7 +310,7 @@ models.BarTypeWeek    // Weekly bars
 models.BarTypeMonth   // Monthly bars
 ```
 
-## 🔐 Error Handling
+## Error Handling
 
 The library provides structured error handling:
 
@@ -334,7 +334,7 @@ if !resp.Success {
 // Success - use resp.Order
 ```
 
-## ⚡ Performance Considerations
+## Performance Considerations
 
 ### Connection Management
 - Reuse client instances across operations
@@ -351,7 +351,7 @@ if !resp.Success {
 - Use context cancellation for long-running operations
 - Properly handle large result sets
 
-## 🧪 Testing
+## Testing
 
 Run the example programs to test functionality:
 
@@ -372,7 +372,7 @@ cd samples/position && go run position_example.go
 cd samples/history && go run history_example.go
 ```
 
-## 📝 Examples
+## Examples
 
 The `samples/` directory contains comprehensive examples:
 
@@ -385,7 +385,7 @@ The `samples/` directory contains comprehensive examples:
 - **WebSocket Integration**: `samples/websocket/integrated_example.go`
 - **Status Monitoring**: `samples/status/status_example.go`
 
-## 🔒 Security
+## Security
 
 - **Never commit API credentials** to version control
 - Use environment variables for sensitive configuration
@@ -393,7 +393,7 @@ The `samples/` directory contains comprehensive examples:
 - Monitor for unauthorized access patterns
 - Use HTTPS for all API communications
 
-## 🚦 Status Codes
+## Status Codes
 
 Common response codes and their meanings:
 
@@ -402,7 +402,7 @@ Common response codes and their meanings:
 - Network errors: Connection, timeout, or DNS issues
 - Authentication errors: Invalid credentials or expired tokens
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -410,7 +410,7 @@ Common response codes and their meanings:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -420,7 +420,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Issues**: Report bugs and feature requests via GitHub Issues
 - **API Reference**: Refer to TopStepX official API documentation
 
-## 🔄 Changelog
+## Changelog
 
 ### Latest Updates
 - Full WebSocket support with automatic reconnection

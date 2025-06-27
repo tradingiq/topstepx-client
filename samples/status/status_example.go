@@ -104,9 +104,9 @@ func main() {
 
 	isHealthy := healthCheck()
 	if isHealthy {
-		fmt.Println("✓ API is healthy and responding")
+		fmt.Println("API is healthy and responding")
 	} else {
-		fmt.Println("✗ API health check failed")
+		fmt.Println("API health check failed")
 	}
 
 	fmt.Println("\n5. Multiple Status Checks")

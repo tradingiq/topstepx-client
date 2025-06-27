@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/philippseith/signalr"
 	"github.com/tradingiq/topstepx-client/client"
@@ -15,23 +16,31 @@ const (
 )
 
 type WebSocketService struct {
-	client        *client.Client
-	conn          signalr.Client
-	receiver      *WebSocketReceiver
-	mu            sync.Mutex
-	isConnected   bool
-	accountID     int
-	subscriptions map[string]bool
+	client              *client.Client
+	conn                signalr.Client
+	receiver            *WebSocketReceiver
+	mu                  sync.Mutex
+	state               ConnectionState
+	accountID           int
+	subscriptions       map[string]bool
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	reconnectChan       chan struct{}
+	connectionHandler   func(ConnectionState)
+	maxReconnectDelay   time.Duration
+	reconnectAttempts   int
 }
 
 type WebSocketReceiver struct {
 	handlers map[string]func(interface{})
 	mu       sync.RWMutex
+	service  *WebSocketService
 }
 
-func NewWebSocketReceiver() *WebSocketReceiver {
+func NewWebSocketReceiver(service *WebSocketService) *WebSocketReceiver {
 	return &WebSocketReceiver{
 		handlers: make(map[string]func(interface{})),
+		service:  service,
 	}
 }
 
@@ -79,29 +88,56 @@ func (r *WebSocketReceiver) GatewayUserTrade(data interface{}) {
 	}
 }
 
-func NewWebSocketService(c *client.Client) *WebSocketService {
-	return &WebSocketService{
-		client:        c,
-		receiver:      NewWebSocketReceiver(),
-		subscriptions: make(map[string]bool),
+// ConnectionClosed is called by SignalR when the connection is closed
+func (r *WebSocketReceiver) ConnectionClosed() {
+	if r.service != nil {
+		r.service.mu.Lock()
+		if r.service.state == StateConnected {
+			r.service.setState(StateReconnecting)
+			r.service.mu.Unlock()
+			// Trigger reconnection
+			select {
+			case r.service.reconnectChan <- struct{}{}:
+			default:
+			}
+		} else {
+			r.service.mu.Unlock()
+		}
 	}
+}
+
+func NewWebSocketService(c *client.Client) *WebSocketService {
+	s := &WebSocketService{
+		client:            c,
+		subscriptions:     make(map[string]bool),
+		state:             StateDisconnected,
+		maxReconnectDelay: 30 * time.Second,
+		reconnectChan:     make(chan struct{}, 1),
+	}
+	s.receiver = NewWebSocketReceiver(s)
+	return s
 }
 
 func (s *WebSocketService) Connect(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.isConnected {
+	if s.state == StateConnected || s.state == StateConnecting {
 		return nil
 	}
 
+	// Create a cancellable context for this connection
+	s.ctx, s.cancel = context.WithCancel(ctx)
+	s.setState(StateConnecting)
+
 	token := s.client.GetToken()
 	if token == "" {
+		s.setState(StateDisconnected)
 		return fmt.Errorf("authentication token not set")
 	}
 
-	conn, err := signalr.NewClient(ctx,
-		signalr.WithHttpConnection(ctx, fmt.Sprintf(UserHubURL, token),
+	conn, err := signalr.NewClient(s.ctx,
+		signalr.WithHttpConnection(s.ctx, fmt.Sprintf(UserHubURL, token),
 			signalr.WithHTTPHeaders(func() http.Header {
 				headers := http.Header{}
 				headers.Set("Authorization", "Bearer "+token)
@@ -112,13 +148,18 @@ func (s *WebSocketService) Connect(ctx context.Context) error {
 	)
 
 	if err != nil {
+		s.setState(StateDisconnected)
 		return fmt.Errorf("failed to create SignalR client: %w", err)
 	}
 
 	conn.Start()
 
 	s.conn = conn
-	s.isConnected = true
+	s.setState(StateConnected)
+	s.reconnectAttempts = 0
+
+	// Set up reconnection handler
+	go s.handleReconnection()
 
 	return nil
 }
@@ -127,13 +168,22 @@ func (s *WebSocketService) Disconnect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected || s.conn == nil {
+	if s.state == StateDisconnected {
 		return nil
 	}
 
-	s.conn.Stop()
-	s.isConnected = false
+	// Cancel the context to stop reconnection attempts
+	if s.cancel != nil {
+		s.cancel()
+	}
+
+	if s.conn != nil {
+		s.conn.Stop()
+	}
+
+	s.setState(StateDisconnected)
 	s.subscriptions = make(map[string]bool)
+	s.accountID = 0
 
 	return nil
 }
@@ -141,7 +191,27 @@ func (s *WebSocketService) Disconnect() error {
 func (s *WebSocketService) IsConnected() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.isConnected
+	return s.state == StateConnected
+}
+
+func (s *WebSocketService) GetConnectionState() ConnectionState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.state
+}
+
+func (s *WebSocketService) SetConnectionHandler(handler func(ConnectionState)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.connectionHandler = handler
+}
+
+func (s *WebSocketService) setState(state ConnectionState) {
+	s.state = state
+	if s.connectionHandler != nil {
+		// Call handler in goroutine to avoid blocking
+		go s.connectionHandler(state)
+	}
 }
 
 func (s *WebSocketService) SetAccountID(accountID int) {
@@ -154,7 +224,7 @@ func (s *WebSocketService) SubscribeAccounts() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -171,7 +241,7 @@ func (s *WebSocketService) UnsubscribeAccounts() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -188,7 +258,7 @@ func (s *WebSocketService) SubscribeOrders(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -206,7 +276,7 @@ func (s *WebSocketService) UnsubscribeOrders(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -223,7 +293,7 @@ func (s *WebSocketService) SubscribePositions(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -241,7 +311,7 @@ func (s *WebSocketService) UnsubscribePositions(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -258,7 +328,7 @@ func (s *WebSocketService) SubscribeTrades(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -276,7 +346,7 @@ func (s *WebSocketService) UnsubscribeTrades(accountID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.isConnected {
+	if s.state != StateConnected {
 		return fmt.Errorf("websocket not connected")
 	}
 
@@ -341,6 +411,120 @@ func (s *WebSocketService) SetPositionHandler(handler func(interface{})) {
 
 func (s *WebSocketService) SetTradeHandler(handler func(interface{})) {
 	s.receiver.SetHandler("trade", handler)
+}
+
+func (s *WebSocketService) handleReconnection() {
+	// Monitor connection state
+	for {
+		select {
+		case <-s.ctx.Done():
+			// Context cancelled, stop monitoring
+			return
+		case <-time.After(5 * time.Second):
+			// Check connection state periodically
+			s.checkConnectionHealth()
+		case <-s.reconnectChan:
+			// Trigger immediate reconnection
+			s.reconnect()
+		}
+	}
+}
+
+func (s *WebSocketService) checkConnectionHealth() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.state != StateConnected || s.conn == nil {
+		return
+	}
+
+	// Try to ping the server to check if connection is alive
+	result := <-s.conn.Invoke("ping")
+	if result.Error != nil {
+		// Connection seems dead, trigger reconnection
+		s.setState(StateReconnecting)
+		select {
+		case s.reconnectChan <- struct{}{}:
+		default:
+			// Channel already has a signal
+		}
+	}
+}
+
+func (s *WebSocketService) reconnect() {
+	s.mu.Lock()
+	if s.state == StateDisconnected {
+		s.mu.Unlock()
+		return
+	}
+	s.setState(StateReconnecting)
+	s.mu.Unlock()
+
+	// Exponential backoff for reconnection
+	baseDelay := time.Second
+	maxDelay := s.maxReconnectDelay
+	
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
+		s.reconnectAttempts++
+		delay := baseDelay * time.Duration(1<<uint(s.reconnectAttempts-1))
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+
+		// Wait before attempting reconnection
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+
+		// Attempt to reconnect
+		s.mu.Lock()
+		if s.conn != nil {
+			s.conn.Stop()
+		}
+		s.mu.Unlock()
+
+		token := s.client.GetToken()
+		if token == "" {
+			continue
+		}
+
+		conn, err := signalr.NewClient(s.ctx,
+			signalr.WithHttpConnection(s.ctx, fmt.Sprintf(UserHubURL, token),
+				signalr.WithHTTPHeaders(func() http.Header {
+					headers := http.Header{}
+					headers.Set("Authorization", "Bearer "+token)
+					return headers
+				}),
+			),
+			signalr.WithReceiver(s.receiver),
+		)
+
+		if err != nil {
+			continue
+		}
+
+		conn.Start()
+
+		s.mu.Lock()
+		s.conn = conn
+		s.setState(StateConnected)
+		s.reconnectAttempts = 0
+		s.mu.Unlock()
+
+		// Resubscribe to all previous subscriptions
+		s.resubscribe()
+		
+		// Successfully reconnected
+		return
+	}
 }
 
 func (s *WebSocketService) resubscribe() {
