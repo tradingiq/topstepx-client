@@ -2,12 +2,14 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
 
 	"github.com/philippseith/signalr"
 	"github.com/tradingiq/topstepx-client/client"
+	"github.com/tradingiq/topstepx-client/models"
 )
 
 const (
@@ -24,49 +26,91 @@ type MarketDataWebSocketService struct {
 }
 
 type MarketDataReceiver struct {
-	handlers map[string]func(string, interface{})
-	mu       sync.RWMutex
+	quoteHandler func(string, models.Quote)
+	tradeHandler func(string, models.TradeData)
+	depthHandler func(string, models.MarketDepthData)
+	mu           sync.RWMutex
 }
 
 func NewMarketDataReceiver() *MarketDataReceiver {
-	return &MarketDataReceiver{
-		handlers: make(map[string]func(string, interface{})),
-	}
+	return &MarketDataReceiver{}
 }
 
-func (r *MarketDataReceiver) SetHandler(event string, handler func(string, interface{})) {
+func (r *MarketDataReceiver) SetQuoteHandler(handler func(string, models.Quote)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.handlers[event] = handler
+	r.quoteHandler = handler
 }
 
-func (r *MarketDataReceiver) RemoveHandler(event string) {
+func (r *MarketDataReceiver) SetTradeHandler(handler func(string, models.TradeData)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.handlers, event)
+	r.tradeHandler = handler
+}
+
+func (r *MarketDataReceiver) SetDepthHandler(handler func(string, models.MarketDepthData)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.depthHandler = handler
 }
 
 func (r *MarketDataReceiver) GatewayQuote(contractID string, data interface{}) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+
+	var quote models.Quote
+	if err := json.Unmarshal(jsonData, &quote); err != nil {
+		return
+	}
+
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if handler, ok := r.handlers["quote"]; ok {
-		handler(contractID, data)
+	handler := r.quoteHandler
+	r.mu.RUnlock()
+
+	if handler != nil {
+		handler(contractID, quote)
 	}
 }
 
 func (r *MarketDataReceiver) GatewayTrade(contractID string, data interface{}) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+
+	var trades models.TradeData
+	if err := json.Unmarshal(jsonData, &trades); err != nil {
+		return
+	}
+
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if handler, ok := r.handlers["trade"]; ok {
-		handler(contractID, data)
+	handler := r.tradeHandler
+	r.mu.RUnlock()
+
+	if handler != nil {
+		handler(contractID, trades)
 	}
 }
 
 func (r *MarketDataReceiver) GatewayDepth(contractID string, data interface{}) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return
+	}
+
+	var depth models.MarketDepthData
+	if err := json.Unmarshal(jsonData, &depth); err != nil {
+		return
+	}
+
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if handler, ok := r.handlers["depth"]; ok {
-		handler(contractID, data)
+	handler := r.depthHandler
+	r.mu.RUnlock()
+
+	if handler != nil {
+		handler(contractID, depth)
 	}
 }
 
@@ -307,16 +351,16 @@ func (s *MarketDataWebSocketService) UnsubscribeAllContracts() error {
 	return nil
 }
 
-func (s *MarketDataWebSocketService) SetQuoteHandler(handler func(string, interface{})) {
-	s.receiver.SetHandler("quote", handler)
+func (s *MarketDataWebSocketService) SetQuoteHandler(handler func(string, models.Quote)) {
+	s.receiver.SetQuoteHandler(handler)
 }
 
-func (s *MarketDataWebSocketService) SetTradeHandler(handler func(string, interface{})) {
-	s.receiver.SetHandler("trade", handler)
+func (s *MarketDataWebSocketService) SetTradeHandler(handler func(string, models.TradeData)) {
+	s.receiver.SetTradeHandler(handler)
 }
 
-func (s *MarketDataWebSocketService) SetDepthHandler(handler func(string, interface{})) {
-	s.receiver.SetHandler("depth", handler)
+func (s *MarketDataWebSocketService) SetDepthHandler(handler func(string, models.MarketDepthData)) {
+	s.receiver.SetDepthHandler(handler)
 }
 
 func (s *MarketDataWebSocketService) handleReconnection() {
@@ -365,4 +409,3 @@ func (s *MarketDataWebSocketService) GetSubscriptions() map[string]map[string]bo
 	}
 	return result
 }
-
