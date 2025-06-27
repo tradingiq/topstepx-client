@@ -2,7 +2,6 @@ package models
 
 import "time"
 
-// Quote represents market quote data
 type Quote struct {
 	BestAsk       float64   `json:"bestAsk"`
 	BestBid       float64   `json:"bestBid"`
@@ -15,7 +14,6 @@ type Quote struct {
 	Volume        float64   `json:"volume"`
 }
 
-// Trade represents a single market trade
 type Trade struct {
 	Price     float64   `json:"price"`
 	SymbolID  string    `json:"symbolId"`
@@ -24,10 +22,8 @@ type Trade struct {
 	Volume    float64   `json:"volume"`
 }
 
-// TradeData represents an array of trades received from websocket
 type TradeData []Trade
 
-// MarketDepth represents a single market depth entry
 type MarketDepth struct {
 	Price         float64   `json:"price"`
 	Volume        float64   `json:"volume"`
@@ -36,5 +32,4 @@ type MarketDepth struct {
 	Timestamp     time.Time `json:"timestamp"`
 }
 
-// MarketDepthData represents an array of market depth entries received from websocket
 type MarketDepthData []MarketDepth

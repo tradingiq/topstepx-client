@@ -92,8 +92,8 @@ func main() {
 	fmt.Printf("\nSelected account: %s (ID: %d)\n", selectedAccount.Name, selectedAccount.ID)
 
 	fmt.Println("\nSetting up WebSocket handlers...")
+	fmt.Println("Note: Order handler now supports both structured (type-safe) and raw (interface{}) data access")
 
-	// Set up connection state handler
 	client.UserData.SetConnectionHandler(func(state services.ConnectionState) {
 		switch state {
 		case services.StateDisconnected:
@@ -109,10 +109,6 @@ func main() {
 
 	client.UserData.SetAccountHandler(func(data interface{}) {
 		fmt.Printf("\n[ACCOUNT UPDATE] %+v\n", data)
-	})
-
-	client.UserData.SetOrderHandler(func(data interface{}) {
-		fmt.Printf("\n[ORDER UPDATE] %+v\n", data)
 	})
 
 	client.UserData.SetPositionHandler(func(data interface{}) {

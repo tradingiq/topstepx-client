@@ -1,6 +1,8 @@
 package models
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -94,6 +96,27 @@ const (
 	OrderStatusPending   OrderStatus = 6
 )
 
+func (o OrderStatus) String() string {
+	switch o {
+	case OrderStatusNone:
+		return "NONE"
+	case OrderStatusOpen:
+		return "OPEN"
+	case OrderStatusFilled:
+		return "FILLED"
+	case OrderStatusCancelled:
+		return "CANCELLED"
+	case OrderStatusExpired:
+		return "EXPIRED"
+	case OrderStatusRejected:
+		return "REJECTED"
+	case OrderStatusPending:
+		return "PENDING"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 type OrderType int
 
 const (
@@ -107,12 +130,46 @@ const (
 	OrderTypeJoinAsk      OrderType = 7
 )
 
+func (o OrderType) String() string {
+	switch o {
+	case OrderTypeUnknown:
+		return "UNKNOWN"
+	case OrderTypeLimit:
+		return "LIMIT"
+	case OrderTypeMarket:
+		return "MARKET"
+	case OrderTypeStopLimit:
+		return "STOP_LIMIT"
+	case OrderTypeStop:
+		return "STOP"
+	case OrderTypeTrailingStop:
+		return "TRAILING_STOP"
+	case OrderTypeJoinBid:
+		return "JOIN_BID"
+	case OrderTypeJoinAsk:
+		return "JOIN_ASK"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 type OrderSide int
 
 const (
 	OrderSideBid OrderSide = 0
 	OrderSideAsk OrderSide = 1
 )
+
+func (o OrderSide) String() string {
+	switch o {
+	case OrderSideBid:
+		return "BUY"
+	case OrderSideAsk:
+		return "SELL"
+	default:
+		return "UNKNOWN"
+	}
+}
 
 type PlaceOrderErrorCode int
 
@@ -440,6 +497,87 @@ type OrderModel struct {
 	LimitPrice        *float64    `json:"limitPrice,omitempty"`
 	StopPrice         *float64    `json:"stopPrice,omitempty"`
 	FillVolume        int32       `json:"fillVolume"`
+}
+
+type OrderUpdateData struct {
+	Action int                `json:"action"`
+	Data   OrderUpdatePayload `json:"data"`
+}
+
+type OrderUpdatePayload struct {
+	AccountID         int32       `json:"accountId"`
+	ContractID        string      `json:"contractId"`
+	CreationTimestamp time.Time   `json:"creationTimestamp"`
+	FillVolume        int32       `json:"fillVolume"`
+	ID                int32       `json:"id"`
+	LimitPrice        float64     `json:"limitPrice"`
+	Side              OrderSide   `json:"side"`
+	Size              int32       `json:"size"`
+	Status            OrderStatus `json:"status"`
+	Type              OrderType   `json:"type"`
+	UpdateTimestamp   time.Time   `json:"updateTimestamp"`
+}
+
+func (o *OrderUpdatePayload) UnmarshalJSON(data []byte) error {
+
+	type rawOrderUpdatePayload struct {
+		AccountID         float64 `json:"accountId"`
+		ContractID        string  `json:"contractId"`
+		CreationTimestamp string  `json:"creationTimestamp"`
+		FillVolume        int32   `json:"fillVolume"`
+		ID                float64 `json:"id"`
+		LimitPrice        float64 `json:"limitPrice"`
+		Side              int32   `json:"side"`
+		Size              int32   `json:"size"`
+		Status            int32   `json:"status"`
+		Type              int32   `json:"type"`
+		UpdateTimestamp   string  `json:"updateTimestamp"`
+	}
+
+	var raw rawOrderUpdatePayload
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	o.AccountID = int32(raw.AccountID)
+	o.ContractID = raw.ContractID
+	o.FillVolume = raw.FillVolume
+	o.ID = int32(raw.ID)
+	o.LimitPrice = raw.LimitPrice
+	o.Side = OrderSide(raw.Side)
+	o.Size = raw.Size
+	o.Status = OrderStatus(raw.Status)
+	o.Type = OrderType(raw.Type)
+
+	var err error
+	o.CreationTimestamp, err = parseTimestamp(raw.CreationTimestamp)
+	if err != nil {
+		return fmt.Errorf("failed to parse CreationTimestamp: %w", err)
+	}
+
+	o.UpdateTimestamp, err = parseTimestamp(raw.UpdateTimestamp)
+	if err != nil {
+		return fmt.Errorf("failed to parse UpdateTimestamp: %w", err)
+	}
+
+	return nil
+}
+
+func parseTimestamp(timestamp string) (time.Time, error) {
+	if timestamp == "" {
+		return time.Time{}, nil
+	}
+
+	t, err := time.Parse(time.RFC3339Nano, timestamp)
+	if err != nil {
+
+		t, err = time.Parse(time.RFC3339, timestamp)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("unable to parse timestamp %q: %w", timestamp, err)
+		}
+	}
+
+	return t, nil
 }
 
 type PositionModel struct {

@@ -5,27 +5,32 @@
 
 **This library is currently under active development and may undergo breaking changes.**
 
-A comprehensive Go client library for the TopStepX trading platform API, providing full access to trading operations, real-time data streaming, and account management functionality.
+A comprehensive Go client library for the TopStepX trading platform API, providing full access to trading operations,
+real-time data streaming, and account management functionality.
 
 ## Features
 
 ### Core Trading Operations
+
 - **Order Management**: Place, modify, and cancel orders with support for all order types
 - **Position Management**: Monitor and manage trading positions
 - **Account Management**: Multi-account support with balance tracking
 - **Trade History**: Access historical trade data and execution details
 
 ### Real-time Data Streaming
+
 - **WebSocket Integration**: Real-time updates via SignalR
 - **Event Handlers**: Custom handlers for account, order, position, and trade updates
 - **Automatic Reconnection**: Built-in connection recovery and resubscription
 
 ### Market Data & Analysis
+
 - **Historical Data**: Multi-timeframe price bars and candlestick data
 - **Contract Information**: Search and retrieve trading instrument details
 - **Live Market Data**: Real-time price updates and market information
 
 ### Advanced Features
+
 - **Authentication Management**: Automatic token handling and refresh
 - **Error Handling**: Comprehensive error codes and structured responses
 - **Context Support**: Full context.Context support for timeouts and cancellation
@@ -51,35 +56,35 @@ go get github.com/tradingiq/topstepx-client
 package main
 
 import (
-    "context"
-    "fmt"
-    "log"
-    
-    "github.com/tradingiq/topstepx-client"
-    "github.com/tradingiq/topstepx-client/models"
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/tradingiq/topstepx-client"
+	"github.com/tradingiq/topstepx-client/models"
 )
 
 func main() {
-    // Create new client
-    client := topstepx.NewClient()
-    ctx := context.Background()
-    
-    // Login with API credentials
-    err := client.LoginAndConnect(ctx, "your-username", "your-api-key")
-    if err != nil {
-        log.Fatalf("Login failed: %v", err)
-    }
-    
-    // Get active trading accounts
-    account, err := client.GetFirstActiveAccount(ctx)
-    if err != nil {
-        log.Fatalf("Failed to get account: %v", err)
-    }
-    
-    fmt.Printf("Account: %s, Balance: $%.2f\n", account.Name, account.Balance)
-    
-    // Clean shutdown
-    defer client.Disconnect(ctx)
+	// Create new client
+	client := topstepx.NewClient()
+	ctx := context.Background()
+
+	// Login with API credentials
+	err := client.LoginAndConnect(ctx, "your-username", "your-api-key")
+	if err != nil {
+		log.Fatalf("Login failed: %v", err)
+	}
+
+	// Get active trading accounts
+	account, err := client.GetFirstActiveAccount(ctx)
+	if err != nil {
+		log.Fatalf("Failed to get account: %v", err)
+	}
+
+	fmt.Printf("Account: %s, Balance: $%.2f\n", account.Name, account.Balance)
+
+	// Clean shutdown
+	defer client.Disconnect(ctx)
 }
 ```
 
@@ -102,8 +107,8 @@ client := topstepx.NewClient()
 
 // Client with custom HTTP options
 client := topstepx.NewClient(
-    client.WithBaseURL("https://custom-api-url.com"),
-    client.WithTimeout(30 * time.Second),
+client.WithBaseURL("https://custom-api-url.com"),
+client.WithTimeout(30 * time.Second),
 )
 ```
 
@@ -112,14 +117,14 @@ client := topstepx.NewClient(
 ```go
 // Login with API key
 resp, err := client.Auth.LoginKey(ctx, &models.LoginApiKeyRequest{
-    UserName: "username",
-    APIKey:   "api-key",
+UserName: "username",
+APIKey:   "api-key",
 })
 
 // Login with app credentials
 resp, err := client.Auth.LoginApp(ctx, &models.LoginAppRequest{
-    UserName: "username",
-    Password: "password",
+UserName: "username",
+Password: "password",
 })
 
 // Validate current session
@@ -134,7 +139,7 @@ resp, err := client.Auth.Logout(ctx)
 ```go
 // Search all accounts
 resp, err := client.Account.SearchAccounts(ctx, &models.SearchAccountRequest{
-    OnlyActiveAccounts: true,
+OnlyActiveAccounts: true,
 })
 
 // Get active accounts (convenience method)
@@ -149,40 +154,40 @@ account, err := client.GetFirstActiveAccount(ctx)
 ```go
 // Place a market order
 resp, err := client.Order.PlaceOrder(ctx, &models.PlaceOrderRequest{
-    AccountID:  accountID,
-    ContractID: contractID,
-    Type:       models.OrderTypeMarket,
-    Side:       models.OrderSideBid,
-    Size:       1,
+AccountID:  accountID,
+ContractID: contractID,
+Type:       models.OrderTypeMarket,
+Side:       models.OrderSideBid,
+Size:       1,
 })
 
 // Place a limit order
 resp, err := client.Order.PlaceOrder(ctx, &models.PlaceOrderRequest{
-    AccountID:  accountID,
-    ContractID: contractID,
-    Type:       models.OrderTypeLimit,
-    Side:       models.OrderSideBid,
-    Size:       1,
-    LimitPrice: &limitPrice,
+AccountID:  accountID,
+ContractID: contractID,
+Type:       models.OrderTypeLimit,
+Side:       models.OrderSideBid,
+Size:       1,
+LimitPrice: &limitPrice,
 })
 
 // Search open orders
 resp, err := client.Order.SearchOpenOrders(ctx, &models.SearchOpenOrderRequest{
-    AccountID: accountID,
+AccountID: accountID,
 })
 
 // Modify existing order
 resp, err := client.Order.ModifyOrder(ctx, &models.ModifyOrderRequest{
-    AccountID:  accountID,
-    OrderID:    orderID,
-    LimitPrice: &newPrice,
-    Size:       &newSize,
+AccountID:  accountID,
+OrderID:    orderID,
+LimitPrice: &newPrice,
+Size:       &newSize,
 })
 
 // Cancel order
 resp, err := client.Order.CancelOrder(ctx, &models.CancelOrderRequest{
-    AccountID: accountID,
-    OrderID:   orderID,
+AccountID: accountID,
+OrderID:   orderID,
 })
 ```
 
@@ -191,20 +196,20 @@ resp, err := client.Order.CancelOrder(ctx, &models.CancelOrderRequest{
 ```go
 // Search current positions
 resp, err := client.Position.SearchPositions(ctx, &models.SearchPositionRequest{
-    AccountID: accountID,
+AccountID: accountID,
 })
 
 // Close entire position
 resp, err := client.Position.CloseContractPosition(ctx, &models.CloseContractPositionRequest{
-    AccountID:  accountID,
-    ContractID: contractID,
+AccountID:  accountID,
+ContractID: contractID,
 })
 
 // Partial position close
 resp, err := client.Position.PartialCloseContractPosition(ctx, &models.PartialCloseContractPositionRequest{
-    AccountID:  accountID,
-    ContractID: contractID,
-    Size:       partialSize,
+AccountID:  accountID,
+ContractID: contractID,
+Size:       partialSize,
 })
 ```
 
@@ -213,14 +218,14 @@ resp, err := client.Position.PartialCloseContractPosition(ctx, &models.PartialCl
 ```go
 // Get price bars
 resp, err := client.History.RetrieveBars(ctx, &models.RetrieveBarRequest{
-    ContractID:        contractID,
-    Live:              false,
-    Unit:              models.AggregateBarUnitMinute,
-    UnitNumber:        5, // 5-minute bars
-    StartTime:         startTime,
-    EndTime:           endTime,
-    Limit:             1000,
-    IncludePartialBar: false,
+ContractID:        contractID,
+Live:              false,
+Unit:              models.AggregateBarUnitMinute,
+UnitNumber:        5, // 5-minute bars
+StartTime:         startTime,
+EndTime:           endTime,
+Limit:             1000,
+IncludePartialBar: false,
 })
 ```
 
@@ -230,13 +235,13 @@ resp, err := client.History.RetrieveBars(ctx, &models.RetrieveBarRequest{
 // Search contracts
 searchText := "ES" // E-mini S&P 500
 resp, err := client.Contract.SearchContracts(ctx, &models.SearchContractRequest{
-    SearchText: &searchText,
-    Live:       true,
+SearchText: &searchText,
+Live:       true,
 })
 
 // Get contract by ID
 resp, err := client.Contract.SearchContractByID(ctx, &models.SearchContractByIdRequest{
-    ContractID: contractID,
+ContractID: contractID,
 })
 ```
 
@@ -244,32 +249,32 @@ resp, err := client.Contract.SearchContractByID(ctx, &models.SearchContractByIdR
 
 ```go
 // Set up event handlers
-client.UserData.SetAccountHandler(func(data interface{}) {
-    fmt.Printf("Account update: %+v\n", data)
+client.UserData.SetAccountHandler(func (data interface{}) {
+fmt.Printf("Account update: %+v\n", data)
 })
 
-client.UserData.SetOrderHandler(func(data interface{}) {
-    fmt.Printf("Order update: %+v\n", data)
+client.UserData.SetOrderHandler(func (data interface{}) {
+fmt.Printf("Order update: %+v\n", data)
 })
 
-client.UserData.SetPositionHandler(func(data interface{}) {
-    fmt.Printf("Position update: %+v\n", data)
+client.UserData.SetPositionHandler(func (data interface{}) {
+fmt.Printf("Position update: %+v\n", data)
 })
 
-client.UserData.SetTradeHandler(func(data interface{}) {
-    fmt.Printf("Trade update: %+v\n", data)
+client.UserData.SetTradeHandler(func (data interface{}) {
+fmt.Printf("Trade update: %+v\n", data)
 })
 
 // Connect and subscribe
 err := client.UserData.Connect(ctx)
 if err != nil {
-    log.Fatalf("UserData connection failed: %v", err)
+log.Fatalf("UserData connection failed: %v", err)
 }
 
 // Subscribe to all events for an account
 err = client.UserData.SubscribeAll(accountID)
 if err != nil {
-    log.Fatalf("Subscription failed: %v", err)
+log.Fatalf("Subscription failed: %v", err)
 }
 
 // Or subscribe to specific events
@@ -309,12 +314,12 @@ models.OrderTypeJoinAsk
 Historical data supports multiple timeframes:
 
 ```go
-models.AggregateBarUnitSecond  // Second bars
-models.AggregateBarUnitMinute  // Minute bars (1, 5, 15, 30, etc.)
+models.AggregateBarUnitSecond // Second bars
+models.AggregateBarUnitMinute // Minute bars (1, 5, 15, 30, etc.)
 models.AggregateBarUnitHour    // Hourly bars
 models.AggregateBarUnitDay     // Daily bars
 models.AggregateBarUnitWeek    // Weekly bars
-models.AggregateBarUnitMonth   // Monthly bars
+models.AggregateBarUnitMonth // Monthly bars
 ```
 
 ## Error Handling
@@ -324,18 +329,18 @@ The library provides structured error handling:
 ```go
 resp, err := client.Order.PlaceOrder(ctx, orderRequest)
 if err != nil {
-    // Network or client error
-    log.Printf("Request failed: %v", err)
-    return
+// Network or client error
+log.Printf("Request failed: %v", err)
+return
 }
 
 if !resp.Success {
-    // API error
-    if resp.ErrorMessage != nil {
-        log.Printf("API error: %s", *resp.ErrorMessage)
-    }
-    log.Printf("Error code: %v", resp.ErrorCode)
-    return
+// API error
+if resp.ErrorMessage != nil {
+log.Printf("API error: %s", *resp.ErrorMessage)
+}
+log.Printf("Error code: %v", resp.ErrorCode)
+return
 }
 
 // Success - use resp.Order
@@ -344,16 +349,19 @@ if !resp.Success {
 ## Performance Considerations
 
 ### Connection Management
+
 - Reuse client instances across operations
 - Use context with appropriate timeouts
 - Handle user data reconnections gracefully
 
 ### Rate Limiting
+
 - The API may have rate limits - implement appropriate backoff strategies
 - Consider batching operations when possible
 - Monitor for rate limit error codes
 
 ### Memory Management
+
 - Close user data connections when done
 - Use context cancellation for long-running operations
 - Properly handle large result sets
@@ -430,6 +438,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Changelog
 
 ### Latest Updates
+
 - Full user data support with automatic reconnection
 - Comprehensive error handling and logging
 - Multi-account management capabilities
@@ -438,4 +447,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Note**: This library is for educational and development purposes. Always test thoroughly in a demo environment before using with live trading accounts. Trading involves significant risk of loss.
+**Note**: This library is for educational and development purposes. Always test thoroughly in a demo environment before
+using with live trading accounts. Trading involves significant risk of loss.

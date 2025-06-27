@@ -27,18 +27,18 @@ const (
 )
 
 type MarketDataWebSocketService struct {
-	client              *client.Client
-	conn                signalr.Client
-	receiver            *MarketDataReceiver
-	mu                  sync.Mutex
-	state               ConnectionState
-	subscriptions       map[string]map[string]bool // map[contractID]map[dataType]bool
-	ctx                 context.Context
-	cancel              context.CancelFunc
-	reconnectChan       chan struct{}
-	connectionHandler   func(ConnectionState)
-	maxReconnectDelay   time.Duration
-	reconnectAttempts   int
+	client            *client.Client
+	conn              signalr.Client
+	receiver          *MarketDataReceiver
+	mu                sync.Mutex
+	state             ConnectionState
+	subscriptions     map[string]map[string]bool
+	ctx               context.Context
+	cancel            context.CancelFunc
+	reconnectChan     chan struct{}
+	connectionHandler func(ConnectionState)
+	maxReconnectDelay time.Duration
+	reconnectAttempts int
 }
 
 type MarketDataReceiver struct {
@@ -73,14 +73,13 @@ func (r *MarketDataReceiver) SetDepthHandler(handler func(string, models.MarketD
 	r.depthHandler = handler
 }
 
-// ConnectionClosed is called by SignalR when the connection is closed
 func (r *MarketDataReceiver) ConnectionClosed() {
 	if r.service != nil {
 		r.service.mu.Lock()
 		if r.service.state == StateConnected {
 			r.service.setState(StateReconnecting)
 			r.service.mu.Unlock()
-			// Trigger reconnection
+
 			select {
 			case r.service.reconnectChan <- struct{}{}:
 			default:
@@ -171,7 +170,6 @@ func (s *MarketDataWebSocketService) Connect(ctx context.Context) error {
 		return nil
 	}
 
-	// Create a cancellable context for this connection
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	s.setState(StateConnecting)
 
@@ -190,7 +188,7 @@ func (s *MarketDataWebSocketService) Connect(ctx context.Context) error {
 			}),
 		),
 		signalr.WithReceiver(s.receiver),
-		signalr.MaximumReceiveMessageSize(1024*1024), // 1MB instead of default 32KB
+		signalr.MaximumReceiveMessageSize(1024*1024),
 	)
 
 	if err != nil {
@@ -204,7 +202,6 @@ func (s *MarketDataWebSocketService) Connect(ctx context.Context) error {
 	s.setState(StateConnected)
 	s.reconnectAttempts = 0
 
-	// Set up reconnection handler
 	go s.handleReconnection()
 
 	return nil
@@ -218,7 +215,6 @@ func (s *MarketDataWebSocketService) Disconnect() error {
 		return nil
 	}
 
-	// Cancel the context to stop reconnection attempts
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -254,7 +250,7 @@ func (s *MarketDataWebSocketService) SetConnectionHandler(handler func(Connectio
 func (s *MarketDataWebSocketService) setState(state ConnectionState) {
 	s.state = state
 	if s.connectionHandler != nil {
-		// Call handler in goroutine to avoid blocking
+
 		go s.connectionHandler(state)
 	}
 }
@@ -440,17 +436,17 @@ func (s *MarketDataWebSocketService) SetDepthHandler(handler func(string, models
 }
 
 func (s *MarketDataWebSocketService) handleReconnection() {
-	// Monitor connection state
+
 	for {
 		select {
 		case <-s.ctx.Done():
-			// Context cancelled, stop monitoring
+
 			return
 		case <-time.After(5 * time.Second):
-			// Check connection state periodically
+
 			s.checkConnectionHealth()
 		case <-s.reconnectChan:
-			// Trigger immediate reconnection
+
 			s.reconnect()
 		}
 	}
@@ -464,17 +460,14 @@ func (s *MarketDataWebSocketService) checkConnectionHealth() {
 		return
 	}
 
-	// Try to ping the server to check if connection is alive
-	// If the connection is dead, the SignalR client should handle it
-	// but we'll also trigger reconnection if needed
 	result := <-s.conn.Invoke("ping")
 	if result.Error != nil {
-		// Connection seems dead, trigger reconnection
+
 		s.setState(StateReconnecting)
 		select {
 		case s.reconnectChan <- struct{}{}:
 		default:
-			// Channel already has a signal
+
 		}
 	}
 }
@@ -491,7 +484,7 @@ func (s *MarketDataWebSocketService) reconnect() {
 	// Exponential backoff for reconnection
 	baseDelay := time.Second
 	maxDelay := s.maxReconnectDelay
-	
+
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -550,7 +543,7 @@ func (s *MarketDataWebSocketService) reconnect() {
 
 		// Resubscribe to all previous subscriptions
 		s.resubscribe()
-		
+
 		// Successfully reconnected
 		return
 	}

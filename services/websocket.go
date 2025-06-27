@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/philippseith/signalr"
 	"github.com/tradingiq/topstepx-client/client"
+	"github.com/tradingiq/topstepx-client/models"
 )
 
 const (
@@ -16,25 +18,26 @@ const (
 )
 
 type UserDataWebSocketService struct {
-	client              *client.Client
-	conn                signalr.Client
-	receiver            *UserDataReceiver
-	mu                  sync.Mutex
-	state               ConnectionState
-	accountID           int
-	subscriptions       map[string]bool
-	ctx                 context.Context
-	cancel              context.CancelFunc
-	reconnectChan       chan struct{}
-	connectionHandler   func(ConnectionState)
-	maxReconnectDelay   time.Duration
-	reconnectAttempts   int
+	client            *client.Client
+	conn              signalr.Client
+	receiver          *UserDataReceiver
+	mu                sync.Mutex
+	state             ConnectionState
+	accountID         int
+	subscriptions     map[string]bool
+	ctx               context.Context
+	cancel            context.CancelFunc
+	reconnectChan     chan struct{}
+	connectionHandler func(ConnectionState)
+	maxReconnectDelay time.Duration
+	reconnectAttempts int
 }
 
 type UserDataReceiver struct {
-	handlers map[string]func(interface{})
-	mu       sync.RWMutex
-	service  *UserDataWebSocketService
+	handlers     map[string]func(interface{})
+	orderHandler func(*models.OrderUpdateData)
+	mu           sync.RWMutex
+	service      *UserDataWebSocketService
 }
 
 func NewUserDataReceiver(service *UserDataWebSocketService) *UserDataReceiver {
@@ -67,6 +70,18 @@ func (r *UserDataReceiver) GatewayUserAccount(data interface{}) {
 func (r *UserDataReceiver) GatewayUserOrder(data interface{}) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
+	if r.orderHandler != nil {
+
+		var orderData models.OrderUpdateData
+		if jsonBytes, err := json.Marshal(data); err == nil {
+			if err := json.Unmarshal(jsonBytes, &orderData); err == nil {
+				r.orderHandler(&orderData)
+				return
+			}
+		}
+	}
+
 	if handler, ok := r.handlers["order"]; ok {
 		handler(data)
 	}
@@ -88,14 +103,13 @@ func (r *UserDataReceiver) GatewayUserTrade(data interface{}) {
 	}
 }
 
-// ConnectionClosed is called by SignalR when the connection is closed
 func (r *UserDataReceiver) ConnectionClosed() {
 	if r.service != nil {
 		r.service.mu.Lock()
 		if r.service.state == StateConnected {
 			r.service.setState(StateReconnecting)
 			r.service.mu.Unlock()
-			// Trigger reconnection
+
 			select {
 			case r.service.reconnectChan <- struct{}{}:
 			default:
@@ -126,7 +140,6 @@ func (s *UserDataWebSocketService) Connect(ctx context.Context) error {
 		return nil
 	}
 
-	// Create a cancellable context for this connection
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	s.setState(StateConnecting)
 
@@ -158,7 +171,6 @@ func (s *UserDataWebSocketService) Connect(ctx context.Context) error {
 	s.setState(StateConnected)
 	s.reconnectAttempts = 0
 
-	// Set up reconnection handler
 	go s.handleReconnection()
 
 	return nil
@@ -172,7 +184,6 @@ func (s *UserDataWebSocketService) Disconnect() error {
 		return nil
 	}
 
-	// Cancel the context to stop reconnection attempts
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -209,7 +220,7 @@ func (s *UserDataWebSocketService) SetConnectionHandler(handler func(ConnectionS
 func (s *UserDataWebSocketService) setState(state ConnectionState) {
 	s.state = state
 	if s.connectionHandler != nil {
-		// Call handler in goroutine to avoid blocking
+
 		go s.connectionHandler(state)
 	}
 }
@@ -401,8 +412,10 @@ func (s *UserDataWebSocketService) SetAccountHandler(handler func(interface{})) 
 	s.receiver.SetHandler("account", handler)
 }
 
-func (s *UserDataWebSocketService) SetOrderHandler(handler func(interface{})) {
-	s.receiver.SetHandler("order", handler)
+func (s *UserDataWebSocketService) SetOrderHandler(handler func(*models.OrderUpdateData)) {
+	s.receiver.mu.Lock()
+	defer s.receiver.mu.Unlock()
+	s.receiver.orderHandler = handler
 }
 
 func (s *UserDataWebSocketService) SetPositionHandler(handler func(interface{})) {
@@ -414,17 +427,17 @@ func (s *UserDataWebSocketService) SetTradeHandler(handler func(interface{})) {
 }
 
 func (s *UserDataWebSocketService) handleReconnection() {
-	// Monitor connection state
+
 	for {
 		select {
 		case <-s.ctx.Done():
-			// Context cancelled, stop monitoring
+
 			return
 		case <-time.After(5 * time.Second):
-			// Check connection state periodically
+
 			s.checkConnectionHealth()
 		case <-s.reconnectChan:
-			// Trigger immediate reconnection
+
 			s.reconnect()
 		}
 	}
@@ -438,10 +451,9 @@ func (s *UserDataWebSocketService) checkConnectionHealth() {
 		return
 	}
 
-	// Try to ping the server to check if connection is alive
 	result := <-s.conn.Invoke("ping")
 	if result.Error != nil {
-		// Connection seems dead, trigger reconnection
+
 		s.setState(StateReconnecting)
 		select {
 		case s.reconnectChan <- struct{}{}:
@@ -463,7 +475,7 @@ func (s *UserDataWebSocketService) reconnect() {
 	// Exponential backoff for reconnection
 	baseDelay := time.Second
 	maxDelay := s.maxReconnectDelay
-	
+
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -521,7 +533,7 @@ func (s *UserDataWebSocketService) reconnect() {
 
 		// Resubscribe to all previous subscriptions
 		s.resubscribe()
-		
+
 		// Successfully reconnected
 		return
 	}
