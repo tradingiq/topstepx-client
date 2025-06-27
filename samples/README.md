@@ -60,10 +60,10 @@ Shows how to check API status and implement health checks.
 go run status/status_example.go
 ```
 
-### 9. WebSocket Streaming (`websocket/`)
-Comprehensive WebSocket examples including real-time quotes, orders, and positions.
+### 9. User Data Streaming (`userdata/`)
+Comprehensive user data examples including real-time account, order, position, and trade updates.
 ```bash
-go run websocket/websocket_example.go
+go run userdata/userdata_example.go
 ```
 
 ### 10. Client Configuration (`client_options/`)
@@ -80,8 +80,8 @@ go run complete_example/complete_example.go
 
 ## Additional Examples
 
-### Integrated WebSocket Example
-The `websocket/integrated_example.go` file shows a production-ready WebSocket integration.
+### Integrated User Data Example
+The `userdata/userdata_example.go` file shows a production-ready user data integration with automatic reconnection.
 
 ### Configuration Helper
 The `config.go` file demonstrates loading configuration from environment variables using `.env` files.
@@ -94,7 +94,7 @@ The `config.go` file demonstrates loading configuration from environment variabl
 
 3. **Rate Limiting**: Be aware of API rate limits when running examples repeatedly.
 
-4. **WebSocket Connections**: WebSocket examples maintain persistent connections. Use Ctrl+C to gracefully shutdown.
+4. **User Data Connections**: User data examples maintain persistent connections. Use Ctrl+C to gracefully shutdown.
 
 5. **Account IDs**: Examples automatically use the first active account. Modify as needed for your use case.
 

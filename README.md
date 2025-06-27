@@ -151,36 +151,38 @@ account, err := client.GetFirstActiveAccount(ctx)
 resp, err := client.Order.PlaceOrder(ctx, &models.PlaceOrderRequest{
     AccountID:  accountID,
     ContractID: contractID,
-    OrderType:  models.OrderTypeMarket,
-    Side:       models.OrderSideBuy,
-    Quantity:   1,
+    Type:       models.OrderTypeMarket,
+    Side:       models.OrderSideBid,
+    Size:       1,
 })
 
 // Place a limit order
 resp, err := client.Order.PlaceOrder(ctx, &models.PlaceOrderRequest{
     AccountID:  accountID,
     ContractID: contractID,
-    OrderType:  models.OrderTypeLimit,
-    Side:       models.OrderSideBuy,
-    Quantity:   1,
-    Price:      &limitPrice,
+    Type:       models.OrderTypeLimit,
+    Side:       models.OrderSideBid,
+    Size:       1,
+    LimitPrice: &limitPrice,
 })
 
 // Search open orders
-resp, err := client.Order.SearchOpenOrders(ctx, &models.SearchOpenOrdersRequest{
+resp, err := client.Order.SearchOpenOrders(ctx, &models.SearchOpenOrderRequest{
     AccountID: accountID,
 })
 
 // Modify existing order
 resp, err := client.Order.ModifyOrder(ctx, &models.ModifyOrderRequest{
-    OrderID:  orderID,
-    Price:    &newPrice,
-    Quantity: &newQuantity,
+    AccountID:  accountID,
+    OrderID:    orderID,
+    LimitPrice: &newPrice,
+    Size:       &newSize,
 })
 
 // Cancel order
 resp, err := client.Order.CancelOrder(ctx, &models.CancelOrderRequest{
-    OrderID: orderID,
+    AccountID: accountID,
+    OrderID:   orderID,
 })
 ```
 
@@ -188,21 +190,21 @@ resp, err := client.Order.CancelOrder(ctx, &models.CancelOrderRequest{
 
 ```go
 // Search current positions
-resp, err := client.Position.SearchPositions(ctx, &models.SearchPositionsRequest{
+resp, err := client.Position.SearchPositions(ctx, &models.SearchPositionRequest{
     AccountID: accountID,
 })
 
 // Close entire position
-resp, err := client.Position.ClosePosition(ctx, &models.ClosePositionRequest{
+resp, err := client.Position.CloseContractPosition(ctx, &models.CloseContractPositionRequest{
     AccountID:  accountID,
     ContractID: contractID,
 })
 
 // Partial position close
-resp, err := client.Position.ClosePosition(ctx, &models.ClosePositionRequest{
+resp, err := client.Position.PartialCloseContractPosition(ctx, &models.PartialCloseContractPositionRequest{
     AccountID:  accountID,
     ContractID: contractID,
-    Quantity:   &partialQuantity,
+    Size:       partialSize,
 })
 ```
 
@@ -210,13 +212,15 @@ resp, err := client.Position.ClosePosition(ctx, &models.ClosePositionRequest{
 
 ```go
 // Get price bars
-resp, err := client.History.GetBars(ctx, &models.GetBarsRequest{
-    ContractID: contractID,
-    BarType:    models.BarTypeMinute,
-    BarSize:    5, // 5-minute bars
-    FromDate:   &startTime,
-    ToDate:     &endTime,
-    Limit:      1000,
+resp, err := client.History.RetrieveBars(ctx, &models.RetrieveBarRequest{
+    ContractID:        contractID,
+    Live:              false,
+    Unit:              models.AggregateBarUnitMinute,
+    UnitNumber:        5, // 5-minute bars
+    StartTime:         startTime,
+    EndTime:           endTime,
+    Limit:             1000,
+    IncludePartialBar: false,
 })
 ```
 
@@ -224,13 +228,16 @@ resp, err := client.History.GetBars(ctx, &models.GetBarsRequest{
 
 ```go
 // Search contracts
-resp, err := client.Contract.SearchContracts(ctx, &models.SearchContractsRequest{
-    SearchText: "ES", // E-mini S&P 500
+searchText := "ES" // E-mini S&P 500
+resp, err := client.Contract.SearchContracts(ctx, &models.SearchContractRequest{
+    SearchText: &searchText,
     Live:       true,
 })
 
 // Get contract by ID
-resp, err := client.Contract.GetContract(ctx, contractID)
+resp, err := client.Contract.SearchContractByID(ctx, &models.SearchContractByIdRequest{
+    ContractID: contractID,
+})
 ```
 
 ### User Data Real-time Updates
@@ -302,12 +309,12 @@ models.OrderTypeJoinAsk
 Historical data supports multiple timeframes:
 
 ```go
-models.BarTypeSecond  // Second bars
-models.BarTypeMinute  // Minute bars (1, 5, 15, 30, etc.)
-models.BarTypeHour    // Hourly bars
-models.BarTypeDay     // Daily bars
-models.BarTypeWeek    // Weekly bars
-models.BarTypeMonth   // Monthly bars
+models.AggregateBarUnitSecond  // Second bars
+models.AggregateBarUnitMinute  // Minute bars (1, 5, 15, 30, etc.)
+models.AggregateBarUnitHour    // Hourly bars
+models.AggregateBarUnitDay     // Daily bars
+models.AggregateBarUnitWeek    // Weekly bars
+models.AggregateBarUnitMonth   // Monthly bars
 ```
 
 ## Error Handling
@@ -363,7 +370,7 @@ cd samples/account && go run account_example.go
 cd samples/order && go run order_example.go
 
 # User data integration example
-cd samples/websocket && go run integrated_example.go
+cd samples/userdata && go run userdata_example.go
 
 # Position management example
 cd samples/position && go run position_example.go
@@ -382,7 +389,7 @@ The `samples/` directory contains comprehensive examples:
 - **Historical Data**: `samples/history/history_example.go`
 - **Contract Search**: `samples/contract/contract_example.go`
 - **Trade History**: `samples/trade/trade_example.go`
-- **User Data Integration**: `samples/websocket/integrated_example.go`
+- **User Data Integration**: `samples/userdata/userdata_example.go`
 - **Status Monitoring**: `samples/status/status_example.go`
 
 ## Security
@@ -414,7 +421,7 @@ Common response codes and their meanings:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## Support
 
 - **Documentation**: Check the `samples/` directory for usage examples
 - **Issues**: Report bugs and feature requests via GitHub Issues
