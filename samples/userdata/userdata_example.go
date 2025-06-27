@@ -111,10 +111,6 @@ func main() {
 		fmt.Printf("\n[ACCOUNT UPDATE] %+v\n", data)
 	})
 
-	client.UserData.SetPositionHandler(func(data interface{}) {
-		fmt.Printf("\n[POSITION UPDATE] %+v\n", data)
-	})
-
 	client.UserData.SetTradeHandler(func(data interface{}) {
 		fmt.Printf("\n[TRADE UPDATE] %+v\n", data)
 	})

@@ -465,14 +465,25 @@ func (s *UserDataWebSocketService) checkConnectionHealth() {
 		return
 	}
 
-	result := <-s.conn.Invoke("ping")
-	if result.Error != nil {
+	// Use a timeout for the ping to avoid blocking indefinitely
+	pingTimeout := time.NewTimer(10 * time.Second)
+	defer pingTimeout.Stop()
 
+	select {
+	case result := <-s.conn.Invoke("ping"):
+		if result.Error != nil {
+			s.setState(StateReconnecting)
+			select {
+			case s.reconnectChan <- struct{}{}:
+			default:
+			}
+		}
+	case <-pingTimeout.C:
+		// Ping timeout - trigger reconnection
 		s.setState(StateReconnecting)
 		select {
 		case s.reconnectChan <- struct{}{}:
 		default:
-			// Channel already has a signal
 		}
 	}
 }
@@ -538,6 +549,25 @@ func (s *UserDataWebSocketService) reconnect() {
 		}
 
 		conn.Start()
+
+		// Test the connection with a ping before marking as connected
+		testTimeout := time.NewTimer(5 * time.Second)
+		defer testTimeout.Stop()
+
+		select {
+		case result := <-conn.Invoke("ping"):
+			if result.Error != nil {
+				conn.Stop()
+				continue
+			}
+		case <-testTimeout.C:
+			// Connection test failed
+			conn.Stop()
+			continue
+		case <-s.ctx.Done():
+			conn.Stop()
+			return
+		}
 
 		s.mu.Lock()
 		s.conn = conn

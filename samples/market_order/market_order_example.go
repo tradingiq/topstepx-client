@@ -66,7 +66,7 @@ func main() {
 	}
 
 	if placeOrderResp.ErrorCode != 0 {
-		log.Fatalf("Order placement failed with error code %d: %s", placeOrderResp.ErrorCode, placeOrderResp.ErrorMessage)
+		log.Fatalf("Order placement failed with error code %d: %s", placeOrderResp.ErrorCode, *placeOrderResp.ErrorMessage)
 	}
 
 	orderID := placeOrderResp.OrderID
