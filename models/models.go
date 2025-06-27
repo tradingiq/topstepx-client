@@ -222,10 +222,23 @@ const (
 type PositionType int
 
 const (
-	PositionTypeUndefined PositionType = 0
-	PositionTypeLong      PositionType = 1
-	PositionTypeShort     PositionType = 2
+	PositionTypeFlat  PositionType = 0
+	PositionTypeLong  PositionType = 1
+	PositionTypeShort PositionType = 2
 )
+
+func (p PositionType) String() string {
+	switch p {
+	case PositionTypeFlat:
+		return "FLAT"
+	case PositionTypeLong:
+		return "LONG"
+	case PositionTypeShort:
+		return "SHORT"
+	default:
+		return "UNKNOWN"
+	}
+}
 
 type ClosePositionErrorCode int
 
@@ -588,6 +601,53 @@ type PositionModel struct {
 	Type              PositionType `json:"type"`
 	Size              int32        `json:"size"`
 	AveragePrice      float64      `json:"averagePrice"`
+}
+
+type PositionUpdateData struct {
+	Action int                   `json:"action"`
+	Data   PositionUpdatePayload `json:"data"`
+}
+
+type PositionUpdatePayload struct {
+	AccountID         int32        `json:"accountId"`
+	AveragePrice      float64      `json:"averagePrice"`
+	ContractID        string       `json:"contractId"`
+	CreationTimestamp time.Time    `json:"creationTimestamp"`
+	ID                int32        `json:"id"`
+	Size              int32        `json:"size"`
+	Type              PositionType `json:"type"`
+}
+
+func (p *PositionUpdatePayload) UnmarshalJSON(data []byte) error {
+	type rawPositionUpdatePayload struct {
+		AccountID         float64 `json:"accountId"`
+		AveragePrice      float64 `json:"averagePrice"`
+		ContractID        string  `json:"contractId"`
+		CreationTimestamp string  `json:"creationTimestamp"`
+		ID                float64 `json:"id"`
+		Size              int32   `json:"size"`
+		Type              int32   `json:"type"`
+	}
+
+	var raw rawPositionUpdatePayload
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	p.AccountID = int32(raw.AccountID)
+	p.AveragePrice = raw.AveragePrice
+	p.ContractID = raw.ContractID
+	p.ID = int32(raw.ID)
+	p.Size = raw.Size
+	p.Type = PositionType(raw.Type)
+
+	var err error
+	p.CreationTimestamp, err = parseTimestamp(raw.CreationTimestamp)
+	if err != nil {
+		return fmt.Errorf("failed to parse CreationTimestamp: %w", err)
+	}
+
+	return nil
 }
 
 type HalfTradeModel struct {

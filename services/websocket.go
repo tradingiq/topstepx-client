@@ -34,10 +34,11 @@ type UserDataWebSocketService struct {
 }
 
 type UserDataReceiver struct {
-	handlers     map[string]func(interface{})
-	orderHandler func(*models.OrderUpdateData)
-	mu           sync.RWMutex
-	service      *UserDataWebSocketService
+	handlers        map[string]func(interface{})
+	orderHandler    func(*models.OrderUpdateData)
+	positionHandler func(*models.PositionUpdateData)
+	mu              sync.RWMutex
+	service         *UserDataWebSocketService
 }
 
 func NewUserDataReceiver(service *UserDataWebSocketService) *UserDataReceiver {
@@ -90,6 +91,17 @@ func (r *UserDataReceiver) GatewayUserOrder(data interface{}) {
 func (r *UserDataReceiver) GatewayUserPosition(data interface{}) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
+	if r.positionHandler != nil {
+		var positionData models.PositionUpdateData
+		if jsonBytes, err := json.Marshal(data); err == nil {
+			if err := json.Unmarshal(jsonBytes, &positionData); err == nil {
+				r.positionHandler(&positionData)
+				return
+			}
+		}
+	}
+
 	if handler, ok := r.handlers["position"]; ok {
 		handler(data)
 	}
@@ -418,8 +430,10 @@ func (s *UserDataWebSocketService) SetOrderHandler(handler func(*models.OrderUpd
 	s.receiver.orderHandler = handler
 }
 
-func (s *UserDataWebSocketService) SetPositionHandler(handler func(interface{})) {
-	s.receiver.SetHandler("position", handler)
+func (s *UserDataWebSocketService) SetPositionHandler(handler func(*models.PositionUpdateData)) {
+	s.receiver.mu.Lock()
+	defer s.receiver.mu.Unlock()
+	s.receiver.positionHandler = handler
 }
 
 func (s *UserDataWebSocketService) SetTradeHandler(handler func(interface{})) {
