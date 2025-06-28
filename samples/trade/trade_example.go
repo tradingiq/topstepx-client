@@ -19,9 +19,19 @@ func main() {
 	)
 
 	ctx := context.Background()
-	err := tsxClient.LoginAndConnect(ctx, samples.Config.Username, samples.Config.ApiKey)
+	// Login
+	resp, err := tsxClient.Auth.LoginKey(ctx, &models.LoginApiKeyRequest{
+		UserName: samples.Config.Username,
+		APIKey:   samples.Config.ApiKey,
+	})
 	if err != nil {
 		log.Fatalf("Login failed: %v", err)
+	}
+	if !resp.Success {
+		if resp.ErrorMessage != nil {
+			log.Fatalf("Login failed: %s", *resp.ErrorMessage)
+		}
+		log.Fatalf("Login failed with error code: %v", resp.ErrorCode)
 	}
 
 	response, err := tsxClient.Account.SearchAccounts(ctx, &models.SearchAccountRequest{

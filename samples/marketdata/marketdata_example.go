@@ -23,11 +23,19 @@ func main() {
 	defer cancel()
 
 	fmt.Println("Logging in...")
-	if err := client.LoginAndConnect(ctx,
-		samples.Config.Username,
-		samples.Config.ApiKey,
-	); err != nil {
+	// Login
+	resp, err := client.Auth.LoginKey(ctx, &models.LoginApiKeyRequest{
+		UserName: samples.Config.Username,
+		APIKey:   samples.Config.ApiKey,
+	})
+	if err != nil {
 		log.Fatal("Failed to login: ", err)
+	}
+	if !resp.Success {
+		if resp.ErrorMessage != nil {
+			log.Fatalf("Login failed: %s", *resp.ErrorMessage)
+		}
+		log.Fatalf("Login failed with error code: %v", resp.ErrorCode)
 	}
 	fmt.Println("Login successful!")
 
@@ -154,8 +162,10 @@ func main() {
 		}
 
 		fmt.Println("Disconnecting...")
-		if err := client.Disconnect(ctx); err != nil {
-			fmt.Printf("Error disconnecting: %v\n", err)
+		client.MarketData.UnsubscribeAllContracts()
+		client.MarketData.Disconnect()
+		if _, err := client.Auth.Logout(ctx); err != nil {
+			fmt.Printf("Error during logout: %v\n", err)
 		}
 
 		fmt.Println("Goodbye!")

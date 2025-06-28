@@ -23,16 +23,38 @@ func main() {
 	)
 
 	ctx := context.Background()
-	err := tsxClient.LoginAndConnect(ctx, username, apiKey)
+	// Login
+	resp, err := tsxClient.Auth.LoginKey(ctx, &models.LoginApiKeyRequest{
+		UserName: username,
+		APIKey:   apiKey,
+	})
 	if err != nil {
 		log.Fatalf("Login failed: %v", err)
 	}
-
-	account, err := tsxClient.GetFirstActiveAccount(ctx)
-	if err != nil {
-		log.Fatalf("GetFistActiveAccount failed: %v", err)
+	if !resp.Success {
+		if resp.ErrorMessage != nil {
+			log.Fatalf("Login failed: %s", *resp.ErrorMessage)
+		}
+		log.Fatalf("Login failed with error code: %v", resp.ErrorCode)
 	}
-	accountID := account.ID
+
+	// Get active accounts
+	accountsResp, err := tsxClient.Account.SearchAccounts(ctx, &models.SearchAccountRequest{
+		OnlyActiveAccounts: true,
+	})
+	if err != nil {
+		log.Fatalf("Failed to search accounts: %v", err)
+	}
+	if !accountsResp.Success {
+		if accountsResp.ErrorMessage != nil {
+			log.Fatalf("Failed to search accounts: %s", *accountsResp.ErrorMessage)
+		}
+		log.Fatalf("Failed to search accounts with error code: %v", accountsResp.ErrorCode)
+	}
+	if len(accountsResp.Accounts) == 0 {
+		log.Fatal("No active accounts found")
+	}
+	accountID := accountsResp.Accounts[0].ID
 
 	fmt.Printf("Using account ID: %d\n", accountID)
 
