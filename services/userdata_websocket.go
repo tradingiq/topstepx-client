@@ -465,7 +465,6 @@ func (s *UserDataWebSocketService) checkConnectionHealth() {
 		return
 	}
 
-	// Use a timeout for the ping to avoid blocking indefinitely
 	pingTimeout := time.NewTimer(10 * time.Second)
 	defer pingTimeout.Stop()
 
@@ -479,7 +478,7 @@ func (s *UserDataWebSocketService) checkConnectionHealth() {
 			}
 		}
 	case <-pingTimeout.C:
-		// Ping timeout - trigger reconnection
+
 		s.setState(StateReconnecting)
 		select {
 		case s.reconnectChan <- struct{}{}:
@@ -497,7 +496,6 @@ func (s *UserDataWebSocketService) reconnect() {
 	s.setState(StateReconnecting)
 	s.mu.Unlock()
 
-	// Exponential backoff for reconnection
 	baseDelay := time.Second
 	maxDelay := s.maxReconnectDelay
 
@@ -514,14 +512,12 @@ func (s *UserDataWebSocketService) reconnect() {
 			delay = maxDelay
 		}
 
-		// Wait before attempting reconnection
 		select {
 		case <-s.ctx.Done():
 			return
 		case <-time.After(delay):
 		}
 
-		// Attempt to reconnect
 		s.mu.Lock()
 		if s.conn != nil {
 			s.conn.Stop()
@@ -550,7 +546,6 @@ func (s *UserDataWebSocketService) reconnect() {
 
 		conn.Start()
 
-		// Test the connection with a ping before marking as connected
 		testTimeout := time.NewTimer(5 * time.Second)
 		defer testTimeout.Stop()
 
@@ -561,7 +556,7 @@ func (s *UserDataWebSocketService) reconnect() {
 				continue
 			}
 		case <-testTimeout.C:
-			// Connection test failed
+
 			conn.Stop()
 			continue
 		case <-s.ctx.Done():
@@ -575,10 +570,8 @@ func (s *UserDataWebSocketService) reconnect() {
 		s.reconnectAttempts = 0
 		s.mu.Unlock()
 
-		// Resubscribe to all previous subscriptions
 		s.resubscribe()
 
-		// Successfully reconnected
 		return
 	}
 }

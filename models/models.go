@@ -489,12 +489,12 @@ type ContractModel struct {
 }
 
 type AggregateBarModel struct {
-	T time.Time `json:"t"`
-	O float64   `json:"o"`
-	H float64   `json:"h"`
-	L float64   `json:"l"`
-	C float64   `json:"c"`
-	V int64     `json:"v"`
+	T      time.Time `json:"t"`
+	Open   float64   `json:"open"`
+	High   float64   `json:"high"`
+	Low    float64   `json:"low"`
+	Close  float64   `json:"close"`
+	Volume int64     `json:"volume"`
 }
 
 type OrderModel struct {

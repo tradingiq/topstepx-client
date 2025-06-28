@@ -260,32 +260,61 @@ client.MarketData.SetDepthHandler(func(contractID string, depth models.MarketDep
 
 ## Examples
 
-The library includes comprehensive examples demonstrating all major functionalities:
+The library includes focused examples demonstrating specific features. Each example is self-contained and demonstrates a single topic.
 
-### Basic Trading Examples
-- **market_order**: Place market orders and manage positions
-- **limit_order**: Place and cancel limit orders
-- **order**: Comprehensive order management (search, place, modify, cancel)
-- **position**: Position management with partial closing
+### Running Examples
 
-### Real-time Data Examples
-- **marketdata**: Stream real-time quotes, trades, and market depth
-- **userdata**: Monitor account updates, orders, positions, and trades
-- **order_handler**: Handle real-time order lifecycle events
-- **position_handler**: Track position changes in real-time
+To run any example, navigate to its directory:
 
-### Account & Information Examples
-- **account**: Search and filter trading accounts
-- **contract**: Search trading instruments and get contract specifications
-- **history**: Retrieve historical price data with various intervals
-- **trade**: Analyze trade history and calculate statistics
-- **status**: Monitor API health and connection status
-
-To run an example:
 ```bash
-cd samples/market_order
-go run market_order_example.go
+cd samples/01_authentication
+go run main.go
 ```
+
+Or run directly from the project root:
+
+```bash
+go run ./samples/01_authentication/main.go
+```
+
+### Available Examples
+
+#### Authentication & Account Management
+- **01_authentication/** - Basic API authentication
+- **02_list_accounts/** - List trading accounts and view balances
+
+#### Order Management
+- **03_place_market_order/** - Place a market order
+- **04_place_limit_order/** - Place a limit order
+- **05_modify_order/** - Modify an existing order
+- **06_cancel_order/** - Cancel an order
+
+#### Position Management
+- **07_list_positions/** - View open positions with P&L
+- **08_close_position/** - Close an open position
+
+#### Market Data
+- **09_search_contracts/** - Search for trading contracts
+- **10_get_historical_data/** - Retrieve historical price bars
+
+#### Real-time Data Streaming
+- **11_stream_quotes/** - Stream real-time market quotes
+- **12_monitor_orders/** - Monitor order updates via WebSocket
+
+### Example Structure
+
+Each example follows this pattern:
+1. **Authentication** - Login with API credentials
+2. **Setup** - Get accounts, find contracts, etc.
+3. **Main Action** - Demonstrate the specific feature
+4. **Output** - Show results with clear formatting
+
+### Key Concepts
+
+- **Error Handling**: All examples include proper error handling and check response success flags
+- **Resource Cleanup**: WebSocket examples properly disconnect and unsubscribe on exit
+- **Demo vs Live Markets**: Examples use demo markets (`Live: false`) by default for safety
+- **Type Safety**: Examples demonstrate the library's type-safe approach with structured data models
 
 ## Configuration
 

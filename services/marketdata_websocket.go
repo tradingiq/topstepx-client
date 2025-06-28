@@ -460,7 +460,6 @@ func (s *MarketDataWebSocketService) checkConnectionHealth() {
 		return
 	}
 
-	// Use a timeout for the ping to avoid blocking indefinitely
 	pingTimeout := time.NewTimer(10 * time.Second)
 	defer pingTimeout.Stop()
 
@@ -474,7 +473,7 @@ func (s *MarketDataWebSocketService) checkConnectionHealth() {
 			}
 		}
 	case <-pingTimeout.C:
-		// Ping timeout - trigger reconnection
+
 		s.setState(StateReconnecting)
 		select {
 		case s.reconnectChan <- struct{}{}:
@@ -492,7 +491,6 @@ func (s *MarketDataWebSocketService) reconnect() {
 	s.setState(StateReconnecting)
 	s.mu.Unlock()
 
-	// Exponential backoff for reconnection
 	baseDelay := time.Second
 	maxDelay := s.maxReconnectDelay
 
@@ -509,14 +507,12 @@ func (s *MarketDataWebSocketService) reconnect() {
 			delay = maxDelay
 		}
 
-		// Wait before attempting reconnection
 		select {
 		case <-s.ctx.Done():
 			return
 		case <-time.After(delay):
 		}
 
-		// Attempt to reconnect
 		s.mu.Lock()
 		if s.conn != nil {
 			s.conn.Stop()
@@ -546,7 +542,6 @@ func (s *MarketDataWebSocketService) reconnect() {
 
 		conn.Start()
 
-		// Test the connection with a ping before marking as connected
 		testTimeout := time.NewTimer(5 * time.Second)
 		defer testTimeout.Stop()
 
