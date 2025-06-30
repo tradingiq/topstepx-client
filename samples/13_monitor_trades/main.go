@@ -25,7 +25,7 @@ func main() {
 		log.Fatal("Login failed")
 	}
 
-	searchText := "MES"
+	searchText := "ES"
 	contractsResp, _ := client.Contract.SearchContracts(ctx, &models.SearchContractRequest{
 		SearchText: &searchText,
 		Live:       false,
@@ -33,31 +33,49 @@ func main() {
 	if len(contractsResp.Contracts) == 0 {
 		log.Fatal("Contract not found")
 	}
-	contractID := contractsResp.Contracts[0].ID
+	contract := contractsResp.Contracts[0]
 
-	client.MarketData.SetQuoteHandler(func(contractID string, quote models.Quote) {
-		fmt.Printf("[%s] %s - Bid: %.2f, Ask: %.2f, Last: %.2f, Volume: %d\n",
-			quote.Timestamp.Format("15:04:05"), contractID,
-			quote.BestBid, quote.BestAsk, quote.LastPrice, quote.Volume)
+	// Set up trade handler
+	client.MarketData.SetTradeHandler(func(contractID string, trades models.TradeData) {
+		for _, trade := range trades {
+			fmt.Printf("\n📊 TRADE - %s\n", contractID)
+			fmt.Printf("  Price: $%.2f\n", trade.Price)
+			fmt.Printf("  Volume: %d\n", trade.Volume)
+			fmt.Printf("  Time: %s\n", trade.Timestamp.Format("15:04:05.000"))
+		}
 	})
 
-	fmt.Println("Connecting to market data...")
+	fmt.Println("Connecting to market data WebSocket...")
 	if err := client.MarketData.Connect(ctx); err != nil {
 		log.Fatal("Failed to connect:", err)
 	}
 
-	fmt.Printf("Subscribing to quotes for %s...\n", contractID)
-	if err := client.MarketData.SubscribeContractQuotes(contractID); err != nil {
+	// Subscribe to trades
+	fmt.Printf("Subscribing to trades for %s (%s)...\n", contract.Name, contract.ID)
+	if err := client.MarketData.SubscribeContractTrades(contract.ID); err != nil {
 		log.Fatal("Failed to subscribe:", err)
 	}
 
-	fmt.Println("✅ Streaming quotes (Press Ctrl+Close to stop)...")
+	fmt.Println("✅ Monitoring trades...")
+	fmt.Println("Press Ctrl+C to stop...")
 
+	// Wait for interrupt
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
 	fmt.Println("\nShutting down...")
-	client.MarketData.UnsubscribeAllContracts()
+	client.MarketData.UnsubscribeContractTrades(contract.ID)
 	client.MarketData.Disconnect()
+}
+
+func getAggressorSide(aggressor int) string {
+	switch aggressor {
+	case 1:
+		return "BUY"
+	case 2:
+		return "SELL"
+	default:
+		return "UNKNOWN"
+	}
 }

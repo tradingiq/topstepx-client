@@ -11,7 +11,7 @@ type Quote struct {
 	LastUpdated   time.Time `json:"lastUpdated"`
 	Symbol        string    `json:"symbol"`
 	Timestamp     time.Time `json:"timestamp"`
-	Volume        float64   `json:"volume"`
+	Volume        int       `json:"volume"`
 }
 
 type Trade struct {
@@ -19,7 +19,7 @@ type Trade struct {
 	SymbolID  string    `json:"symbolId"`
 	Timestamp time.Time `json:"timestamp"`
 	Type      int       `json:"type"`
-	Volume    float64   `json:"volume"`
+	Volume    int       `json:"volume"`
 }
 
 type TradeData []Trade
@@ -27,7 +27,7 @@ type TradeData []Trade
 type MarketDepth struct {
 	Price         float64   `json:"price"`
 	Volume        float64   `json:"volume"`
-	CurrentVolume float64   `json:"currentVolume"`
+	CurrentVolume int       `json:"currentVolume"`
 	Type          int       `json:"type"`
 	Timestamp     time.Time `json:"timestamp"`
 }
