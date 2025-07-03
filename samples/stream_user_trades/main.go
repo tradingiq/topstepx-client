@@ -17,11 +17,10 @@ import (
 )
 
 func main() {
-	// Initialize the client
+
 	client := topstepx.NewClient()
 	ctx := context.Background()
 
-	// Authenticate using API key
 	fmt.Println("Authenticating...")
 	resp, err := client.Auth.LoginKey(ctx, &models.LoginApiKeyRequest{
 		UserName: samples.Config.Username,
@@ -35,7 +34,6 @@ func main() {
 	}
 	fmt.Println("Authentication successful!")
 
-	// Get accounts to select one for trade monitoring
 	fmt.Println("\nFetching accounts...")
 	accounts, err := client.GetActiveAccounts(ctx)
 	if err != nil {
@@ -46,22 +44,17 @@ func main() {
 		log.Fatal("No accounts found")
 	}
 
-	// Use the first account
 	account := accounts[0]
 	fmt.Printf("Using account: %s (ID: %d)\n", account.Name, account.ID)
 
-	// Get user data websocket service
 	userDataWS := client.UserData
 
-	// Set up trade update handler with structured data
 	userDataWS.SetTradeHandler(func(update *models.TradeUpdateData) {
 		fmt.Println("\n========== TRADE UPDATE RECEIVED ==========")
 		fmt.Printf("Timestamp: %s\n", time.Now().Format("2006-01-02 15:04:05.000"))
-		
-		// Display action type
+
 		fmt.Printf("Action: %d\n", update.Action)
-		
-		// Display trade details
+
 		fmt.Println("\n--- Trade Details ---")
 		fmt.Printf("Trade ID:     %d\n", update.Data.ID)
 		fmt.Printf("Account ID:   %d\n", update.Data.AccountID)
@@ -73,12 +66,10 @@ func main() {
 		fmt.Printf("Fees:         $%.2f\n", update.Data.Fees)
 		fmt.Printf("Voided:       %v\n", update.Data.Voided)
 		fmt.Printf("Executed At:  %s\n", update.Data.CreationTimestamp.Format("2006-01-02 15:04:05"))
-		
-		// Calculate trade value
+
 		tradeValue := float64(update.Data.Size) * update.Data.Price
 		fmt.Printf("Trade Value:  $%.2f\n", tradeValue)
-		
-		// Pretty print the full struct as JSON for reference
+
 		fmt.Println("\n--- Full JSON Structure ---")
 		jsonBytes, err := json.MarshalIndent(update, "", "  ")
 		if err != nil {
@@ -86,26 +77,22 @@ func main() {
 		} else {
 			fmt.Printf("%s\n", string(jsonBytes))
 		}
-		
+
 		fmt.Println("==========================================\n")
 	})
 
-	// Set connection state handler
 	userDataWS.SetConnectionHandler(func(state services.ConnectionState) {
 		fmt.Printf("[Connection State Changed] %s at %s\n",
 			state, time.Now().Format("15:04:05.000"))
 	})
 
-	// Connect to websocket
 	fmt.Println("\nConnecting to user data websocket...")
 	if err := userDataWS.Connect(ctx); err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
 
-	// Wait a moment for connection to establish
 	time.Sleep(2 * time.Second)
 
-	// Subscribe to trades
 	fmt.Printf("Subscribing to trade updates for account %d...\n", account.ID)
 	if err := userDataWS.SubscribeTrades(int(account.ID)); err != nil {
 		log.Fatalf("Failed to subscribe to trades: %v", err)
@@ -114,22 +101,17 @@ func main() {
 	fmt.Println("\nListening for trade updates... (Press Ctrl+C to exit)")
 	fmt.Println("NOTE: Trade updates will appear when trades are executed on this account")
 
-	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	// Keep the program running
 	<-sigChan
 
-	// Cleanup
 	fmt.Println("\nShutting down...")
 
-	// Unsubscribe from trades
 	if err := userDataWS.UnsubscribeTrades(int(account.ID)); err != nil {
 		fmt.Printf("Error unsubscribing from trades: %v\n", err)
 	}
 
-	// Disconnect
 	if err := userDataWS.Disconnect(); err != nil {
 		fmt.Printf("Error disconnecting: %v\n", err)
 	}
