@@ -664,6 +664,24 @@ type AccountUpdatePayload struct {
 	Simulated bool    `json:"simulated"`
 }
 
+type TradeUpdateData struct {
+	Action int                `json:"action"`
+	Data   TradeUpdatePayload `json:"data"`
+}
+
+type TradeUpdatePayload struct {
+	ID                int32     `json:"id"`
+	AccountID         int32     `json:"accountId"`
+	ContractID        string    `json:"contractId"`
+	CreationTimestamp time.Time `json:"creationTimestamp"`
+	OrderID           int32     `json:"orderId"`
+	Price             float64   `json:"price"`
+	Side              OrderSide `json:"side"`
+	Size              int32     `json:"size"`
+	Fees              float64   `json:"fees"`
+	Voided            bool      `json:"voided"`
+}
+
 type HalfTradeModel struct {
 	ID                int32     `json:"id"`
 	AccountID         int32     `json:"accountId"`

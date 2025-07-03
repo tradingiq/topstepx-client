@@ -38,6 +38,7 @@ type UserDataReceiver struct {
 	accountHandler  func(*models.AccountUpdateData)
 	orderHandler    func(*models.OrderUpdateData)
 	positionHandler func(*models.PositionUpdateData)
+	tradeHandler    func(*models.TradeUpdateData)
 	mu              sync.RWMutex
 	service         *UserDataWebSocketService
 }
@@ -122,6 +123,17 @@ func (r *UserDataReceiver) GatewayUserPosition(data interface{}) {
 func (r *UserDataReceiver) GatewayUserTrade(data interface{}) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
+	if r.tradeHandler != nil {
+		var tradeData models.TradeUpdateData
+		if jsonBytes, err := json.Marshal(data); err == nil {
+			if err := json.Unmarshal(jsonBytes, &tradeData); err == nil {
+				r.tradeHandler(&tradeData)
+				return
+			}
+		}
+	}
+
 	if handler, ok := r.handlers["trade"]; ok {
 		handler(data)
 	}
@@ -451,8 +463,10 @@ func (s *UserDataWebSocketService) SetPositionHandler(handler func(*models.Posit
 	s.receiver.positionHandler = handler
 }
 
-func (s *UserDataWebSocketService) SetTradeHandler(handler func(interface{})) {
-	s.receiver.SetHandler("trade", handler)
+func (s *UserDataWebSocketService) SetTradeHandler(handler func(*models.TradeUpdateData)) {
+	s.receiver.mu.Lock()
+	defer s.receiver.mu.Unlock()
+	s.receiver.tradeHandler = handler
 }
 
 func (s *UserDataWebSocketService) handleReconnection() {

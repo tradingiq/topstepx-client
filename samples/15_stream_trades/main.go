@@ -53,78 +53,40 @@ func main() {
 	// Get user data websocket service
 	userDataWS := client.UserData
 
-	// Set up trade update handler with detailed printf debugging
-	userDataWS.SetTradeHandler(func(data interface{}) {
+	// Set up trade update handler with structured data
+	userDataWS.SetTradeHandler(func(update *models.TradeUpdateData) {
 		fmt.Println("\n========== TRADE UPDATE RECEIVED ==========")
 		fmt.Printf("Timestamp: %s\n", time.Now().Format("2006-01-02 15:04:05.000"))
-
-		// Print raw data type
-		fmt.Printf("Data Type: %T\n", data)
-
-		// Pretty print the raw JSON data
-		jsonBytes, err := json.MarshalIndent(data, "", "  ")
+		
+		// Display action type
+		fmt.Printf("Action: %d\n", update.Action)
+		
+		// Display trade details
+		fmt.Println("\n--- Trade Details ---")
+		fmt.Printf("Trade ID:     %d\n", update.Data.ID)
+		fmt.Printf("Account ID:   %d\n", update.Data.AccountID)
+		fmt.Printf("Contract ID:  %s\n", update.Data.ContractID)
+		fmt.Printf("Order ID:     %d\n", update.Data.OrderID)
+		fmt.Printf("Side:         %s\n", update.Data.Side.String())
+		fmt.Printf("Size:         %d\n", update.Data.Size)
+		fmt.Printf("Price:        %.2f\n", update.Data.Price)
+		fmt.Printf("Fees:         $%.2f\n", update.Data.Fees)
+		fmt.Printf("Voided:       %v\n", update.Data.Voided)
+		fmt.Printf("Executed At:  %s\n", update.Data.CreationTimestamp.Format("2006-01-02 15:04:05"))
+		
+		// Calculate trade value
+		tradeValue := float64(update.Data.Size) * update.Data.Price
+		fmt.Printf("Trade Value:  $%.2f\n", tradeValue)
+		
+		// Pretty print the full struct as JSON for reference
+		fmt.Println("\n--- Full JSON Structure ---")
+		jsonBytes, err := json.MarshalIndent(update, "", "  ")
 		if err != nil {
 			fmt.Printf("Error marshaling data: %v\n", err)
-			fmt.Printf("Raw data: %+v\n", data)
 		} else {
-			fmt.Printf("JSON Data:\n%s\n", string(jsonBytes))
+			fmt.Printf("%s\n", string(jsonBytes))
 		}
-
-		// Try to extract specific fields if it's a map
-		if tradeMap, ok := data.(map[string]interface{}); ok {
-			fmt.Println("\n--- Extracted Trade Fields ---")
-
-			// Common trade fields to look for
-			fields := []string{
-				"tradeId", "TradeId", "id", "Id",
-				"orderId", "OrderId", "orderID", "OrderID",
-				"accountId", "AccountId", "accountID", "AccountID",
-				"symbol", "Symbol", "contractId", "ContractId",
-				"side", "Side", "direction", "Direction",
-				"quantity", "Quantity", "qty", "Qty",
-				"price", "Price", "fillPrice", "FillPrice",
-				"commission", "Commission", "fees", "Fees",
-				"executionTime", "ExecutionTime", "timestamp", "Timestamp",
-				"tradeType", "TradeType", "type", "Type",
-				"status", "Status", "state", "State",
-			}
-
-			for _, field := range fields {
-				if value, exists := tradeMap[field]; exists {
-					fmt.Printf("%s: %v", field, value)
-
-					// Special formatting for certain fields
-					switch field {
-					case "side", "Side", "direction", "Direction":
-						if v, ok := value.(float64); ok {
-							if v == 1 {
-								fmt.Printf(" (BUY)")
-							} else if v == -1 || v == 2 {
-								fmt.Printf(" (SELL)")
-							}
-						}
-					case "executionTime", "ExecutionTime", "timestamp", "Timestamp":
-						// Try to parse as timestamp if it's a string
-						if timeStr, ok := value.(string); ok {
-							fmt.Printf(" (parsed: %s)", timeStr)
-						}
-					}
-					fmt.Println()
-				}
-			}
-
-			// Calculate P&L if available
-			if qty, hasQty := tradeMap["quantity"]; hasQty {
-				if price, hasPrice := tradeMap["price"]; hasPrice {
-					if qtyFloat, ok1 := qty.(float64); ok1 {
-						if priceFloat, ok2 := price.(float64); ok2 {
-							fmt.Printf("Trade Value: %.2f\n", qtyFloat*priceFloat)
-						}
-					}
-				}
-			}
-		}
-
+		
 		fmt.Println("==========================================\n")
 	})
 
