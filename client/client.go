@@ -56,7 +56,7 @@ func NewClient(opts ...Option) *Client {
 		httpClient: &http.Client{
 			Timeout: DefaultTimeout,
 		},
-		userAgent: "topstepx-go-client/1.0.0",
+		userAgent: "projectx-go-client/1.0.0",
 	}
 
 	for _, opt := range opts {

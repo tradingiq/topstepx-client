@@ -7,8 +7,8 @@ import (
 )
 
 type Cfg struct {
-	Username string `env:"TOPSTEPX_USERNAME,required"`
-	ApiKey   string `env:"TOPSTEPX_API_KEY,required"`
+	Username string `env:"PROJECTX_USERNAME,required"`
+	ApiKey   string `env:"PROJECTX_API_KEY,required"`
 }
 
 var Config Cfg

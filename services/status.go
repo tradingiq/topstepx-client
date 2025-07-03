@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/tradingiq/topstepx-client/client"
+	"github.com/tradingiq/projectx-client/client"
 )
 
 type StatusService struct {

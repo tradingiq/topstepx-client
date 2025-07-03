@@ -10,14 +10,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tradingiq/topstepx-client"
-	"github.com/tradingiq/topstepx-client/models"
-	"github.com/tradingiq/topstepx-client/samples"
-	"github.com/tradingiq/topstepx-client/services"
+	"github.com/tradingiq/projectx-client"
+	"github.com/tradingiq/projectx-client/models"
+	"github.com/tradingiq/projectx-client/samples"
+	"github.com/tradingiq/projectx-client/services"
 )
 
 func main() {
-	client := topstepx.NewClient()
+	client := projectx.NewClient()
 	ctx := context.Background()
 
 	fmt.Println("Authenticating...")
@@ -51,9 +51,9 @@ func main() {
 	userDataWS.SetPositionHandler(func(update *models.PositionUpdateData) {
 		fmt.Println("\n========== POSITION UPDATE RECEIVED ==========")
 		fmt.Printf("Timestamp: %s\n", time.Now().Format("2006-01-02 15:04:05.000"))
-		
+
 		fmt.Printf("Action: %d\n", update.Action)
-		
+
 		fmt.Println("\n--- Position Details ---")
 		fmt.Printf("Position ID:  %d\n", update.Data.ID)
 		fmt.Printf("Account ID:   %d\n", update.Data.AccountID)
@@ -62,10 +62,10 @@ func main() {
 		fmt.Printf("Size:         %d\n", update.Data.Size)
 		fmt.Printf("Avg Price:    %.2f\n", update.Data.AveragePrice)
 		fmt.Printf("Created At:   %s\n", update.Data.CreationTimestamp.Format("2006-01-02 15:04:05"))
-		
+
 		positionValue := float64(update.Data.Size) * update.Data.AveragePrice
 		fmt.Printf("Position Value: $%.2f\n", positionValue)
-		
+
 		fmt.Println("\n--- Full JSON Structure ---")
 		jsonBytes, err := json.MarshalIndent(update, "", "  ")
 		if err != nil {
@@ -73,7 +73,7 @@ func main() {
 		} else {
 			fmt.Printf("%s\n", string(jsonBytes))
 		}
-		
+
 		fmt.Println("===============================================\n")
 	})
 

@@ -1,12 +1,12 @@
-package topstepx
+package projectx
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/tradingiq/topstepx-client/client"
-	"github.com/tradingiq/topstepx-client/models"
-	"github.com/tradingiq/topstepx-client/services"
+	"github.com/tradingiq/projectx-client/client"
+	"github.com/tradingiq/projectx-client/models"
+	"github.com/tradingiq/projectx-client/services"
 )
 
 type Client struct {
@@ -50,7 +50,6 @@ func (c *Client) GetToken() string {
 	return c.client.GetToken()
 }
 
-
 func (c *Client) GetActiveAccounts(ctx context.Context) ([]models.TradingAccountModel, error) {
 	resp, err := c.Account.SearchAccounts(ctx, &models.SearchAccountRequest{
 		OnlyActiveAccounts: true,
@@ -68,4 +67,3 @@ func (c *Client) GetActiveAccounts(ctx context.Context) ([]models.TradingAccount
 
 	return resp.Accounts, nil
 }
-

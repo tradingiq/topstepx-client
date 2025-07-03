@@ -1,4 +1,4 @@
-module github.com/tradingiq/topstepx-client
+module github.com/tradingiq/projectx-client
 
 go 1.24
 

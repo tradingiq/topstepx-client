@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/tradingiq/topstepx-client"
-	"github.com/tradingiq/topstepx-client/models"
-	"github.com/tradingiq/topstepx-client/samples"
+	"github.com/tradingiq/projectx-client"
+	"github.com/tradingiq/projectx-client/models"
+	"github.com/tradingiq/projectx-client/samples"
 )
 
 // Demonstrates: Placing a market order
 func main() {
-	client := topstepx.NewClient()
+	client := projectx.NewClient()
 	ctx := context.Background()
 
 	// Authenticate

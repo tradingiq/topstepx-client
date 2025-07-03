@@ -1,6 +1,6 @@
-# TopStepX Go Client Library
+# ProjectX Go Client Library
 
-A comprehensive Go SDK for interacting with the TopStepX trading platform API. This library provides complete access to trading operations, real-time market data, account management, and historical data retrieval.
+A comprehensive Go SDK for interacting with the ProjectX trading platform API. This library provides complete access to trading operations, real-time market data, account management, and historical data retrieval.
 
 ## Features
 
@@ -16,13 +16,13 @@ A comprehensive Go SDK for interacting with the TopStepX trading platform API. T
 ## Installation
 
 ```bash
-go get github.com/tradingiq/topstepx-client
+go get github.com/tradingiq/projectx-client
 ```
 
 ## Requirements
 
 - Go 1.24 or higher
-- Active TopStepX trading account
+- Active ProjectX trading account
 - API credentials (username and API key)
 
 ## Quick Start
@@ -36,20 +36,20 @@ import (
     "log"
     "os"
     
-    "github.com/tradingiq/topstepx-client"
-    "github.com/tradingiq/topstepx-client/models"
+    "github.com/tradingiq/projectx-client"
+    "github.com/tradingiq/projectx-client/models"
 )
 
 func main() {
     // Create client
-    client := topstepx.NewClient()
+    client := projectx.NewClient()
     
     ctx := context.Background()
     
     // Login with API credentials
     resp, err := client.Auth.LoginKey(ctx, &models.LoginApiKeyRequest{
-        UserName: os.Getenv("TOPSTEPX_USERNAME"),
-        APIKey:   os.Getenv("TOPSTEPX_API_KEY"),
+        UserName: os.Getenv("PROJECTX_USERNAME"),
+        APIKey:   os.Getenv("PROJECTX_API_KEY"),
     })
     if err != nil {
         log.Fatal("Failed to login:", err)
@@ -320,14 +320,14 @@ Each example follows this pattern:
 
 Set your credentials using environment variables:
 ```bash
-export TOPSTEPX_USERNAME="your_username"
-export TOPSTEPX_API_KEY="your_api_key"
+export PROJECTX_USERNAME="your_username"
+export PROJECTX_API_KEY="your_api_key"
 ```
 
 Or use a `.env` file:
 ```env
-TOPSTEPX_USERNAME=your_username
-TOPSTEPX_API_KEY=your_api_key
+PROJECTX_USERNAME=your_username
+PROJECTX_API_KEY=your_api_key
 ```
 
 ## Architecture
@@ -350,9 +350,9 @@ TOPSTEPX_API_KEY=your_api_key
 
 ## API Endpoints
 
-- Base API: `https://api.topstepx.com`
-- User Data WebSocket: `https://rtc.topstepx.com/hubs/user`
-- Market Data WebSocket: `https://rtc.topstepx.com/hubs/market`
+- Base API: `https://api.projectx.com`
+- User Data WebSocket: `https://rtc.projectx.com/hubs/user`
+- Market Data WebSocket: `https://rtc.projectx.com/hubs/market`
 
 ## Contributing
 
@@ -369,4 +369,4 @@ This project is licensed under the MIT License with Attribution - see the LICENS
 
 ## Support
 
-For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/tradingiq/topstepx-client).
+For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/tradingiq/projectx-client).

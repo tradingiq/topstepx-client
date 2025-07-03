@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/philippseith/signalr"
-	"github.com/tradingiq/topstepx-client/client"
-	"github.com/tradingiq/topstepx-client/models"
+	"github.com/tradingiq/projectx-client/client"
+	"github.com/tradingiq/projectx-client/models"
 )
 
 const (
-	UserHubURL = "https://rtc.topstepx.com/hubs/user?access_token=%s"
+	UserHubURL = "https://rtc.projectx.com/hubs/user?access_token=%s"
 )
 
 type UserDataWebSocketService struct {

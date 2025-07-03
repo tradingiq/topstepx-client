@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/philippseith/signalr"
-	"github.com/tradingiq/topstepx-client/client"
-	"github.com/tradingiq/topstepx-client/models"
+	"github.com/tradingiq/projectx-client/client"
+	"github.com/tradingiq/projectx-client/models"
 )
 
 const (
-	MarketHubURL = "https://rtc.topstepx.com/hubs/market?access_token=%s"
+	MarketHubURL = "https://rtc.projectx.com/hubs/market?access_token=%s"
 )
 
 type ConnectionState int

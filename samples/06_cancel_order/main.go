@@ -6,13 +6,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/tradingiq/topstepx-client"
-	"github.com/tradingiq/topstepx-client/models"
-	"github.com/tradingiq/topstepx-client/samples"
+	"github.com/tradingiq/projectx-client"
+	"github.com/tradingiq/projectx-client/models"
+	"github.com/tradingiq/projectx-client/samples"
 )
 
 func main() {
-	client := topstepx.NewClient()
+	client := projectx.NewClient()
 	ctx := context.Background()
 
 	loginResp, _ := client.Auth.LoginKey(ctx, &models.LoginApiKeyRequest{
