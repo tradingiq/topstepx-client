@@ -189,6 +189,7 @@ func (s *MarketDataWebSocketService) Connect(ctx context.Context) error {
 		),
 		signalr.WithReceiver(s.receiver),
 		signalr.MaximumReceiveMessageSize(1024*1024),
+		signalr.Logger(newNoopLogger(), false),
 	)
 
 	if err != nil {
@@ -534,6 +535,7 @@ func (s *MarketDataWebSocketService) reconnect() {
 			),
 			signalr.WithReceiver(s.receiver),
 			signalr.MaximumReceiveMessageSize(1024*1024),
+			signalr.Logger(newNoopLogger(), false),
 		)
 
 		if err != nil {

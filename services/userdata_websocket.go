@@ -170,6 +170,7 @@ func (s *UserDataWebSocketService) Connect(ctx context.Context) error {
 			}),
 		),
 		signalr.WithReceiver(s.receiver),
+		signalr.Logger(newNoopLogger(), false),
 	)
 
 	if err != nil {
@@ -538,6 +539,7 @@ func (s *UserDataWebSocketService) reconnect() {
 				}),
 			),
 			signalr.WithReceiver(s.receiver),
+			signalr.Logger(newNoopLogger(), false),
 		)
 
 		if err != nil {
