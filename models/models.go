@@ -650,6 +650,20 @@ func (p *PositionUpdatePayload) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type AccountUpdateData struct {
+	Action int                  `json:"action"`
+	Data   AccountUpdatePayload `json:"data"`
+}
+
+type AccountUpdatePayload struct {
+	ID        int32   `json:"id"`
+	Name      string  `json:"name"`
+	Balance   float64 `json:"balance"`
+	CanTrade  bool    `json:"canTrade"`
+	IsVisible bool    `json:"isVisible"`
+	Simulated bool    `json:"simulated"`
+}
+
 type HalfTradeModel struct {
 	ID                int32     `json:"id"`
 	AccountID         int32     `json:"accountId"`

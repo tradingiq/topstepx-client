@@ -35,6 +35,7 @@ type UserDataWebSocketService struct {
 
 type UserDataReceiver struct {
 	handlers        map[string]func(interface{})
+	accountHandler  func(*models.AccountUpdateData)
 	orderHandler    func(*models.OrderUpdateData)
 	positionHandler func(*models.PositionUpdateData)
 	mu              sync.RWMutex
@@ -63,6 +64,17 @@ func (r *UserDataReceiver) RemoveHandler(event string) {
 func (r *UserDataReceiver) GatewayUserAccount(data interface{}) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
+	if r.accountHandler != nil {
+		var accountData models.AccountUpdateData
+		if jsonBytes, err := json.Marshal(data); err == nil {
+			if err := json.Unmarshal(jsonBytes, &accountData); err == nil {
+				r.accountHandler(&accountData)
+				return
+			}
+		}
+	}
+
 	if handler, ok := r.handlers["account"]; ok {
 		handler(data)
 	}
@@ -421,8 +433,10 @@ func (s *UserDataWebSocketService) UnsubscribeAll() error {
 	return nil
 }
 
-func (s *UserDataWebSocketService) SetAccountHandler(handler func(interface{})) {
-	s.receiver.SetHandler("account", handler)
+func (s *UserDataWebSocketService) SetAccountHandler(handler func(*models.AccountUpdateData)) {
+	s.receiver.mu.Lock()
+	defer s.receiver.mu.Unlock()
+	s.receiver.accountHandler = handler
 }
 
 func (s *UserDataWebSocketService) SetOrderHandler(handler func(*models.OrderUpdateData)) {
